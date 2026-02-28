@@ -1,15 +1,16 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { Message } from '@/types';
+import { Message, Product } from '@/types';
 import ChatBubble from './ChatBubble';
 
 interface ConversationPanelProps {
   messages: Message[];
   isLoading: boolean;
+  onAddToCart?: (product: Product) => Promise<void>;
 }
 
-export default function ConversationPanel({ messages, isLoading }: ConversationPanelProps) {
+export default function ConversationPanel({ messages, isLoading, onAddToCart }: ConversationPanelProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -19,10 +20,9 @@ export default function ConversationPanel({ messages, isLoading }: ConversationP
   return (
     <div className="flex-1 overflow-y-auto px-4 py-6 space-y-5 scroll-smooth">
       {messages.map((msg) => (
-        <ChatBubble key={msg.id} message={msg} />
+        <ChatBubble key={msg.id} message={msg} onAddToCart={onAddToCart} />
       ))}
 
-      {/* Thinking indicator */}
       {isLoading && (
         <div className="flex justify-start">
           <div className="max-w-[85%]">

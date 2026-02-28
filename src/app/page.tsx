@@ -2,9 +2,17 @@
 
 import { useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Message, MicState, ChatResponse } from '@/types';
+import { Message, MicState, ChatResponse, Product } from '@/types';
 import VoiceMic from '@/components/VoiceMic';
 import ConversationPanel from '@/components/ConversationPanel';
+
+interface CartState {
+  cartId: string;
+  checkoutUrl: string;
+  totalQuantity: number;
+  totalAmount: string;
+  currency: string;
+}
 
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -12,6 +20,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [interimText, setInterimText] = useState('');
   const [textInput, setTextInput] = useState('');
+  const [cart, setCart] = useState<CartState | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const idCounter = useRef(0);
 
@@ -56,6 +65,28 @@ export default function Home() {
     }
   }, []);
 
+  const handleAddToCart = useCallback(async (product: Product) => {
+    const res = await fetch('/api/cart', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        variantId: product.variantId,
+        cartId: cart?.cartId || null,
+      }),
+    });
+
+    if (!res.ok) throw new Error('Cart failed');
+
+    const data = await res.json();
+    setCart({
+      cartId: data.cartId,
+      checkoutUrl: data.checkoutUrl,
+      totalQuantity: data.totalQuantity,
+      totalAmount: data.totalAmount,
+      currency: data.currency,
+    });
+  }, [cart]);
+
   const handleTranscript = useCallback(async (transcript: string) => {
     if (!transcript.trim()) return;
     setMicState('processing');
@@ -89,6 +120,7 @@ export default function Home() {
         role: 'assistant',
         content: data.message,
         products: data.products,
+        created: data.created,
       };
 
       setMessages(prev => [...prev, assistantMessage]);
@@ -119,7 +151,7 @@ export default function Home() {
   const hasMessages = messages.length > 0;
 
   const statusText = micState === 'idle'
-    ? (hasMessages ? 'Tap mic or type below' : 'Tap mic or type below')
+    ? 'Tap mic or type below'
     : micState === 'listening'
     ? 'Listening — tap again to send'
     : micState === 'processing'
@@ -149,19 +181,46 @@ export default function Home() {
             <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-medium">AI Shopping Assistant</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <div className={`w-1.5 h-1.5 rounded-full ${
-            micState === 'idle' ? 'bg-slate-600' :
-            micState === 'listening' ? 'bg-violet-400 animate-pulse' :
-            micState === 'processing' ? 'bg-cyan-400 animate-pulse' :
-            'bg-emerald-400 animate-pulse'
-          }`} />
-          <span className="text-[11px] text-slate-500 font-medium">
-            {micState === 'idle' ? 'Ready' :
-             micState === 'listening' ? 'Listening' :
-             micState === 'processing' ? 'Thinking' :
-             'Speaking'}
-          </span>
+
+        <div className="flex items-center gap-4">
+          {/* Status */}
+          <div className="flex items-center gap-2">
+            <div className={`w-1.5 h-1.5 rounded-full ${
+              micState === 'idle' ? 'bg-slate-600' :
+              micState === 'listening' ? 'bg-violet-400 animate-pulse' :
+              micState === 'processing' ? 'bg-cyan-400 animate-pulse' :
+              'bg-emerald-400 animate-pulse'
+            }`} />
+            <span className="text-[11px] text-slate-500 font-medium">
+              {micState === 'idle' ? 'Ready' :
+               micState === 'listening' ? 'Listening' :
+               micState === 'processing' ? 'Thinking' :
+               'Speaking'}
+            </span>
+          </div>
+
+          {/* Cart badge */}
+          {cart && (
+            <motion.a
+              href={cart.checkoutUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: 'spring', stiffness: 300 }}
+              className="relative flex items-center gap-2 px-3 py-1.5 rounded-full bg-violet-500/15 border border-violet-500/20 hover:bg-violet-500/25 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-violet-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                <circle cx="9" cy="21" r="1" />
+                <circle cx="20" cy="21" r="1" />
+                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+              </svg>
+              <span className="text-xs font-medium text-violet-300">
+                {cart.totalQuantity} — ${parseFloat(cart.totalAmount).toFixed(2)}
+              </span>
+              <span className="text-[10px] text-violet-400">Checkout →</span>
+            </motion.a>
+          )}
         </div>
       </header>
 
@@ -169,7 +228,6 @@ export default function Home() {
       <div className="relative z-10 flex-1 flex flex-col min-h-0">
         <AnimatePresence mode="wait">
           {!hasMessages ? (
-            /* Welcome state */
             <motion.div
               key="welcome"
               initial={{ opacity: 0 }}
@@ -198,7 +256,6 @@ export default function Home() {
                 </motion.p>
               </div>
 
-              {/* Mic + text input row */}
               <motion.div
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -212,14 +269,12 @@ export default function Home() {
                   onStateChange={setMicState}
                 />
 
-                {/* Live transcript */}
                 {interimText && (
                   <p className="text-sm text-slate-300 text-center max-w-sm px-4 italic">
                     &ldquo;{interimText}&rdquo;
                   </p>
                 )}
 
-                {/* Text input */}
                 <form onSubmit={handleTextSubmit} className="w-full max-w-md">
                   <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/[0.04] border border-white/[0.08] focus-within:border-violet-500/30 transition-colors">
                     <input
@@ -250,7 +305,6 @@ export default function Home() {
                 {statusText}
               </motion.p>
 
-              {/* Example prompts */}
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -260,7 +314,7 @@ export default function Home() {
                 {[
                   'Show me a hoodie',
                   'What do you have under $20?',
-                  'I need a mug',
+                  'Add a vintage jacket for $59.99',
                 ].map((prompt) => (
                   <button
                     key={prompt}
@@ -274,7 +328,6 @@ export default function Home() {
               </motion.div>
             </motion.div>
           ) : (
-            /* Conversation state */
             <motion.div
               key="conversation"
               initial={{ opacity: 0 }}
@@ -282,13 +335,13 @@ export default function Home() {
               transition={{ duration: 0.3 }}
               className="flex-1 flex flex-col min-h-0"
             >
-              <ConversationPanel messages={messages} isLoading={isLoading} />
+              <ConversationPanel messages={messages} isLoading={isLoading} onAddToCart={handleAddToCart} />
             </motion.div>
           )}
         </AnimatePresence>
       </div>
 
-      {/* Bottom input bar (when in conversation) */}
+      {/* Bottom input bar */}
       {hasMessages && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}

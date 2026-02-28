@@ -7,15 +7,24 @@ import { Product } from '@/types';
 interface ProductCardProps {
   product: Product;
   index: number;
+  onAddToCart?: (product: Product) => Promise<void>;
 }
 
-export default function ProductCard({ product, index }: ProductCardProps) {
-  const [added, setAdded] = useState(false);
+export default function ProductCard({ product, index, onAddToCart }: ProductCardProps) {
+  const [status, setStatus] = useState<'idle' | 'adding' | 'added'>('idle');
 
-  const handleAddToCart = (e: React.MouseEvent) => {
+  const handleAddToCart = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    setAdded(true);
-    setTimeout(() => setAdded(false), 2000);
+    if (status !== 'idle') return;
+
+    setStatus('adding');
+    try {
+      await onAddToCart?.(product);
+      setStatus('added');
+      setTimeout(() => setStatus('idle'), 2500);
+    } catch {
+      setStatus('idle');
+    }
   };
 
   return (
@@ -26,7 +35,6 @@ export default function ProductCard({ product, index }: ProductCardProps) {
       whileHover={{ y: -4, scale: 1.02 }}
       className="group rounded-2xl bg-white/[0.04] border border-white/[0.06] overflow-hidden backdrop-blur-sm hover:border-white/[0.12] hover:bg-white/[0.06] transition-colors duration-300"
     >
-      {/* Image */}
       <div className="relative aspect-square overflow-hidden bg-white/[0.02]">
         {product.image ? (
           <img
@@ -43,16 +51,14 @@ export default function ProductCard({ product, index }: ProductCardProps) {
           </div>
         )}
 
-        {/* Price badge */}
         <div className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10">
           <span className="text-sm font-semibold text-white">
             ${parseFloat(product.price).toFixed(0)}
           </span>
         </div>
 
-        {/* Added overlay */}
         <AnimatePresence>
-          {added && (
+          {status === 'added' && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -74,7 +80,6 @@ export default function ProductCard({ product, index }: ProductCardProps) {
         </AnimatePresence>
       </div>
 
-      {/* Info */}
       <div className="p-4">
         <h3 className="text-sm font-medium text-slate-200 truncate leading-snug">
           {product.title}
@@ -88,13 +93,16 @@ export default function ProductCard({ product, index }: ProductCardProps) {
           </span>
           <button
             onClick={handleAddToCart}
-            className={`text-xs font-medium px-2.5 py-1 rounded-full transition-all duration-300 cursor-pointer ${
-              added
+            disabled={status !== 'idle'}
+            className={`text-xs font-medium px-2.5 py-1 rounded-full transition-all duration-300 cursor-pointer disabled:cursor-default ${
+              status === 'added'
                 ? 'bg-emerald-500/20 text-emerald-300'
+                : status === 'adding'
+                ? 'bg-white/[0.06] text-slate-500'
                 : 'bg-violet-500/15 text-violet-300 hover:bg-violet-500/25'
             }`}
           >
-            {added ? 'Added!' : 'Add to Cart'}
+            {status === 'added' ? 'Added!' : status === 'adding' ? '...' : 'Add to Cart'}
           </button>
         </div>
       </div>
