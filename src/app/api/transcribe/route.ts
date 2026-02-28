@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
           data: base64Audio,
         },
       },
-      { text: 'Transcribe this audio exactly as spoken. Return ONLY the transcription text, nothing else. No quotes, no labels, no explanation.' },
+      { text: 'Transcribe this audio exactly as spoken, in whatever language it is in. Return ONLY the transcription text, nothing else. No quotes, no labels, no explanation. Preserve the original language.' },
     ]);
 
     const transcript = result.response.text().trim();

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Message, MicState, ChatResponse, Product } from '@/types';
 import VoiceMic from '@/components/VoiceMic';
@@ -21,11 +21,21 @@ export default function Home() {
   const [interimText, setInterimText] = useState('');
   const [textInput, setTextInput] = useState('');
   const [cart, setCart] = useState<CartState | null>(null);
+  const [shopperMemory, setShopperMemory] = useState<string | null>(null);
+  const [memoryLoading, setMemoryLoading] = useState(true);
   const lastProductsRef = useRef<{ title: string; variantId: string }[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const idCounter = useRef(0);
 
   const genId = () => `msg-${++idCounter.current}-${Date.now()}`;
+
+  useEffect(() => {
+    fetch('/api/memory')
+      .then(r => r.json())
+      .then(data => setShopperMemory(data.memory))
+      .catch(() => {})
+      .finally(() => setMemoryLoading(false));
+  }, []);
 
   const playTTS = useCallback(async (text: string) => {
     try {
@@ -268,7 +278,7 @@ export default function Home() {
                   transition={{ delay: 0.1 }}
                   className="text-4xl sm:text-5xl font-bold tracking-tight gradient-text"
                 >
-                  Shop by Voice
+                  {shopperMemory ? 'Welcome Back' : 'Shop by Voice'}
                 </motion.h2>
                 <motion.p
                   initial={{ opacity: 0, y: 20 }}
@@ -276,9 +286,25 @@ export default function Home() {
                   transition={{ delay: 0.2 }}
                   className="text-base text-slate-500 max-w-sm mx-auto leading-relaxed"
                 >
-                  Speak or type what you&apos;re looking for.
-                  I&apos;ll find the perfect products for you.
+                  {memoryLoading ? (
+                    'Loading your preferences...'
+                  ) : shopperMemory ? (
+                    shopperMemory
+                  ) : (
+                    <>Speak or type what you&apos;re looking for. I&apos;ll find the perfect products for you.</>
+                  )}
                 </motion.p>
+                {shopperMemory && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.35 }}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/20"
+                  >
+                    <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                    <span className="text-[11px] text-cyan-400 font-medium">Powered by Backboard.io Memory</span>
+                  </motion.div>
+                )}
               </div>
 
               <motion.div

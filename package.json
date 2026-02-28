@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "backboard-sdk": "^1.5.2",
     "framer-motion": "^12.34.3",
     "next": "16.1.6",
     "react": "19.2.3",

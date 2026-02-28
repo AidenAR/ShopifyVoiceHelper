@@ -2,9 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { parseIntent, generateResponse } from '@/lib/gemini';
 import { searchProducts } from '@/lib/shopify';
 import { createProduct, updateProductPrice, getStoreAnalytics, createDiscountCode } from '@/lib/shopify-admin';
+import { saveShoppingEvent } from '@/lib/backboard';
 
 function emptyResponse(message: string) {
   return { message, products: [], created: null, priceUpdate: null, analytics: null, discount: null, addedToCart: null };
+}
+
+function rememberEvent(event: string) {
+  saveShoppingEvent(event).catch(() => {});
 }
 
 export async function POST(req: NextRequest) {
@@ -15,12 +20,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing transcript' }, { status: 400 });
     }
 
-    let intent: any = { action: 'search', searchQuery: transcript };
+    let intent: any = { action: 'search', searchQuery: transcript, lang: 'en' };
     try {
       intent = await parseIntent(transcript, history || [], lastProducts);
     } catch (err) {
       console.error('Gemini intent parsing failed:', err);
     }
+    const lang = intent.lang || 'en';
 
     // --- ADD TO CART ---
     if (intent.action === 'add_to_cart') {
@@ -32,7 +38,8 @@ export async function POST(req: NextRequest) {
       if (match) {
         const context = `Added "${match.title}" to cart.`;
         let message = `Done, I added ${match.title} to your cart!`;
-        try { message = await generateResponse(transcript, context, history || []); } catch {}
+        try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
+        rememberEvent(`Shopper added "${match.title}" to their cart`);
         return NextResponse.json({
           ...emptyResponse(message),
           addedToCart: { title: match.title, variantId: match.variantId },
@@ -54,7 +61,8 @@ export async function POST(req: NextRequest) {
         });
         const context = `Product created: "${created.title}" at $${created.price}`;
         let message = `Done! Created "${created.title}" for $${created.price}.`;
-        try { message = await generateResponse(transcript, context, history || []); } catch {}
+        try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
+        rememberEvent(`Shopper created a new product: "${created.title}" priced at $${created.price}`);
         return NextResponse.json({
           ...emptyResponse(message),
           created: { id: created.id, title: created.title, price: created.price, handle: created.handle, image: created.image },
@@ -72,7 +80,8 @@ export async function POST(req: NextRequest) {
         const result = await updateProductPrice(intent.productName, intent.newPrice);
         const context = `Updated "${result.title}" price from $${result.oldPrice} to $${result.newPrice}`;
         let message = `Done! ${result.title} is now $${result.newPrice}, was $${result.oldPrice}.`;
-        try { message = await generateResponse(transcript, context, history || []); } catch {}
+        try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
+        rememberEvent(`Shopper changed price of "${result.title}" from $${result.oldPrice} to $${result.newPrice}`);
         return NextResponse.json({
           ...emptyResponse(message),
           priceUpdate: { title: result.title, oldPrice: result.oldPrice, newPrice: result.newPrice },
@@ -88,7 +97,8 @@ export async function POST(req: NextRequest) {
         const stats = await getStoreAnalytics();
         const context = `Store stats: ${stats.totalOrders} total orders, $${stats.totalRevenue} revenue, ${stats.todayOrders} orders today ($${stats.todayRevenue}), ${stats.totalProducts} products, best seller: ${stats.bestSeller}`;
         let message = `You have ${stats.totalOrders} orders totaling $${stats.totalRevenue}. Best seller is ${stats.bestSeller}.`;
-        try { message = await generateResponse(transcript, context, history || []); } catch {}
+        try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
+        rememberEvent(`Shopper checked store analytics: ${stats.totalOrders} orders, $${stats.totalRevenue} revenue, best seller: ${stats.bestSeller}`);
         return NextResponse.json({
           ...emptyResponse(message),
           analytics: stats,
@@ -108,7 +118,8 @@ export async function POST(req: NextRequest) {
         );
         const context = `Discount code "${result.code}" created for ${result.percentage}% off`;
         let message = `Done! Discount code ${result.code} is live — ${result.percentage}% off.`;
-        try { message = await generateResponse(transcript, context, history || []); } catch {}
+        try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
+        rememberEvent(`Shopper created discount code "${result.code}" for ${result.percentage}% off`);
         return NextResponse.json({
           ...emptyResponse(message),
           discount: { code: result.code, percentage: result.percentage, description: result.description },
@@ -127,7 +138,10 @@ export async function POST(req: NextRequest) {
     let message = products.length > 0
       ? `Here's what I found for "${searchQuery}".`
       : `Couldn't find anything for "${searchQuery}". Try different words?`;
-    try { message = await generateResponse(transcript, context, history || []); } catch {}
+    try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
+    if (products.length > 0) {
+      rememberEvent(`Shopper searched for "${searchQuery}" and found: ${products.map(p => p.title).join(', ')}`);
+    }
     return NextResponse.json({ ...emptyResponse(message), products });
 
   } catch (err) {

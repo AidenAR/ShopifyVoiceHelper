@@ -59,6 +59,17 @@
 - Clean description generation — Gemini rewrites messy voice input into proper text
 - Confirmation card with code, percentage, and description
 
+## Cross-Session Memory (Backboard.io)
+
+- **Persistent shopper memory** powered by Backboard.io — remembers what you browsed, bought, and created across sessions
+- On every interaction, shopping events are automatically saved to Backboard with `memory: "Auto"`
+  - Product searches, cart additions, product creation, price changes, discount codes
+- **Personalized welcome on return** — when you reopen the app, Backboard recalls your history:
+  - *"Welcome Back! You searched for hoodies and added the Test Hoodie ($60) to your cart. You created a discount code LISTENHACKS and show interest in streetwear."*
+- Memory is stored at the assistant level, so it persists across all sessions
+- "Powered by Backboard.io Memory" badge shown on the welcome screen
+- Uses the Backboard.io SDK with assistant threads and automatic memory extraction
+
 ## Intent Recognition
 
 Gemini 2.5 Flash classifies every user message into one of 6 actions:
@@ -72,6 +83,17 @@ Gemini 2.5 Flash classifies every user message into one of 6 actions:
 | `analytics` | "how are sales?", "what's my revenue?" |
 | `create_discount` | "create a 20% off code called SAVE20" |
 
+## Multi-Language Support
+
+- **Speak in any language** — Gemini detects the language automatically
+- Search queries are internally translated to English for Shopify, but all responses come back in the user's language
+- Supported for all features: search, product creation, price editing, analytics, discount codes
+- **ElevenLabs multilingual TTS** — responses are spoken aloud in the detected language using `eleven_multilingual_v2`
+- Examples:
+  - French: "Montre-moi des chandails" → responds in French with product results
+  - Spanish: "¿Cómo van mis ventas?" → analytics response in Spanish
+  - Any of the 29 languages ElevenLabs supports
+
 ## UI / UX
 
 - Dark gradient mesh background with ambient animated orbs
@@ -80,4 +102,5 @@ Gemini 2.5 Flash classifies every user message into one of 6 actions:
 - Conversational chat interface with user/assistant bubbles
 - Rich response cards: product grids, analytics dashboards, discount badges, price update confirmations
 - Quick-start prompt buttons on the welcome screen
+- Personalized "Welcome Back" screen with shopper memory summary
 - Persistent bottom input bar during conversation

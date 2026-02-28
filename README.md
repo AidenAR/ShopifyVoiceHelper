@@ -14,6 +14,7 @@ Tap the mic (or type) and say things like:
 - *"How are my sales?"*
 - *"Create a 20% off code called LISTENHACKS"*
 - *"Add the hoodie to my cart"*
+- *"Montre-moi des chandails"* — works in French, Spanish, and 25+ other languages
 
 ## Tech Stack
 
@@ -26,6 +27,7 @@ Tap the mic (or type) and say things like:
 | NLU / Intent | Google Gemini 2.5 Flash |
 | Image Generation | Google Gemini 2.0 Flash Image Generation |
 | Text → Speech | ElevenLabs Streaming TTS |
+| Persistent Memory | Backboard.io (cross-session shopper memory) |
 | Store API | Shopify Storefront API (GraphQL) + Admin API (REST) |
 | Auth | Shopify OAuth 2.0 for Admin scopes |
 
@@ -35,11 +37,13 @@ Tap the mic (or type) and say things like:
 Browser (mic) → MediaRecorder → /api/transcribe (Gemini STT)
                                         ↓
                                   /api/chat (Gemini NLU)
-                                   ↓          ↓          ↓
-                             Storefront    Admin API   Gemini Image Gen
-                             (search)      (CRUD)      (product photos)
-                                   ↓
-                              /api/tts (ElevenLabs) → Audio playback
+                                   ↓          ↓          ↓          ↓
+                             Storefront    Admin API   Gemini      Backboard.io
+                             (search)      (CRUD)      (images)    (memory)
+                                   ↓                                    ↓
+                              /api/tts (ElevenLabs)        "Welcome back! You
+                                   ↓                        were looking at hoodies"
+                             Audio playback
 ```
 
 ## Getting Started
@@ -65,6 +69,7 @@ SHOPIFY_STOREFRONT_TOKEN=your_storefront_token
 SHOPIFY_CLIENT_ID=your_app_client_id
 SHOPIFY_CLIENT_SECRET=your_app_client_secret
 SHOPIFY_ADMIN_TOKEN=your_admin_api_token
+BACKBOARD_API_KEY=your_backboard_api_key
 ```
 
 ### 3. Shopify Admin token (OAuth)
@@ -94,6 +99,7 @@ src/
 │       ├── tts/route.ts      # ElevenLabs text-to-speech proxy
 │       ├── transcribe/route.ts  # Gemini audio transcription
 │       ├── cart/route.ts     # Shopify Storefront cart mutations
+│       ├── memory/route.ts  # Backboard.io persistent memory
 │       └── auth/             # Shopify OAuth install + callback
 ├── components/
 │   ├── VoiceMic.tsx          # MediaRecorder mic with visual states
@@ -105,6 +111,7 @@ src/
 │   ├── gemini.ts             # Intent parsing + response generation
 │   ├── shopify.ts            # Storefront API client (search, cart)
 │   ├── shopify-admin.ts      # Admin API client (CRUD, analytics, discounts, image gen)
+│   ├── backboard.ts          # Backboard.io persistent memory client
 │   └── elevenlabs.ts         # TTS client
 └── types/
     └── index.ts              # Shared TypeScript interfaces
@@ -115,7 +122,7 @@ src/
 - **Google Gemini** — NLU, speech-to-text, AI image generation
 - **ElevenLabs** — natural text-to-speech
 - **Shopify** — Storefront + Admin APIs
-- **Backboard.io** — event infrastructure
+- **Backboard.io** — persistent cross-session shopper memory
 
 ## Team
 
