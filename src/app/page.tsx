@@ -21,6 +21,7 @@ export default function Home() {
   const [interimText, setInterimText] = useState('');
   const [textInput, setTextInput] = useState('');
   const [cart, setCart] = useState<CartState | null>(null);
+  const lastProductsRef = useRef<{ title: string; variantId: string }[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const idCounter = useRef(0);
 
@@ -110,10 +111,30 @@ export default function Home() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transcript, history }),
+        body: JSON.stringify({ transcript, history, lastProducts: lastProductsRef.current }),
       });
 
       const data: ChatResponse = await res.json();
+
+      // Track last shown products for voice cart
+      if (data.products && data.products.length > 0) {
+        lastProductsRef.current = data.products.map(p => ({ title: p.title, variantId: p.variantId }));
+      }
+
+      // Handle voice add-to-cart
+      if (data.addedToCart?.variantId) {
+        try {
+          const cartRes = await fetch('/api/cart', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ variantId: data.addedToCart.variantId, cartId: cart?.cartId || null }),
+          });
+          if (cartRes.ok) {
+            const cartData = await cartRes.json();
+            setCart({ cartId: cartData.cartId, checkoutUrl: cartData.checkoutUrl, totalQuantity: cartData.totalQuantity, totalAmount: cartData.totalAmount, currency: cartData.currency });
+          }
+        } catch (e) { console.error('Voice cart error:', e); }
+      }
 
       const assistantMessage: Message = {
         id: genId(),
@@ -121,6 +142,10 @@ export default function Home() {
         content: data.message,
         products: data.products,
         created: data.created,
+        priceUpdate: data.priceUpdate,
+        analytics: data.analytics,
+        discount: data.discount,
+        addedToCart: data.addedToCart,
       };
 
       setMessages(prev => [...prev, assistantMessage]);
@@ -313,8 +338,9 @@ export default function Home() {
               >
                 {[
                   'Show me a hoodie',
-                  'What do you have under $20?',
                   'Add a vintage jacket for $59.99',
+                  'How are my sales?',
+                  'Create a 25% off code called LISTENHACKS',
                 ].map((prompt) => (
                   <button
                     key={prompt}

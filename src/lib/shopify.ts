@@ -154,26 +154,57 @@ async function storefrontFetch(query: string, variables: Record<string, any> = {
   return data.data;
 }
 
+function mapProducts(edges: any[]): Product[] {
+  return edges.map((edge: any) => ({
+    id: edge.node.id,
+    variantId: edge.node.variants.edges[0]?.node?.id || '',
+    title: edge.node.title,
+    description: edge.node.description,
+    handle: edge.node.handle,
+    price: parseFloat(edge.node.priceRange.minVariantPrice.amount).toFixed(2),
+    currency: edge.node.priceRange.minVariantPrice.currencyCode,
+    image: edge.node.images.edges[0]?.node?.url || null,
+    imageAlt: edge.node.images.edges[0]?.node?.altText || edge.node.title,
+    url: edge.node.onlineStoreUrl || `https://${SHOPIFY_DOMAIN}/products/${edge.node.handle}`,
+  }));
+}
+
 export async function searchProducts(query: string, first: number = 6): Promise<Product[]> {
   if (!SHOPIFY_DOMAIN || !STOREFRONT_TOKEN) {
     return getMockProducts(query);
   }
 
   try {
-    const data = await storefrontFetch(PRODUCTS_QUERY, { query, first });
+    // Try original query first
+    let data = await storefrontFetch(PRODUCTS_QUERY, { query, first });
+    let products = mapProducts(data.products.edges);
 
-    return data.products.edges.map((edge: any) => ({
-      id: edge.node.id,
-      variantId: edge.node.variants.edges[0]?.node?.id || '',
-      title: edge.node.title,
-      description: edge.node.description,
-      handle: edge.node.handle,
-      price: parseFloat(edge.node.priceRange.minVariantPrice.amount).toFixed(2),
-      currency: edge.node.priceRange.minVariantPrice.currencyCode,
-      image: edge.node.images.edges[0]?.node?.url || null,
-      imageAlt: edge.node.images.edges[0]?.node?.altText || edge.node.title,
-      url: edge.node.onlineStoreUrl || `https://${SHOPIFY_DOMAIN}/products/${edge.node.handle}`,
-    }));
+    // If no results, try singularized (remove trailing s/es) and individual words
+    if (products.length === 0) {
+      const singular = query.replace(/ies$/, 'y').replace(/es$/, 'e').replace(/s$/, '');
+      if (singular !== query) {
+        data = await storefrontFetch(PRODUCTS_QUERY, { query: singular, first });
+        products = mapProducts(data.products.edges);
+      }
+    }
+
+    // If still no results, try each word individually
+    if (products.length === 0 && query.includes(' ')) {
+      const words = query.split(/\s+/).filter(w => w.length > 2);
+      for (const word of words) {
+        data = await storefrontFetch(PRODUCTS_QUERY, { query: word, first });
+        products = mapProducts(data.products.edges);
+        if (products.length > 0) break;
+      }
+    }
+
+    // Last resort: fetch all products
+    if (products.length === 0) {
+      data = await storefrontFetch(PRODUCTS_QUERY, { query: '*', first });
+      products = mapProducts(data.products.edges);
+    }
+
+    return products;
   } catch (err) {
     console.error('Shopify API error, falling back to mock:', err);
     return getMockProducts(query);
