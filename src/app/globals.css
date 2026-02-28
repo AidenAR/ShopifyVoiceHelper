@@ -1,0 +1,90 @@
+@import "tailwindcss";
+
+:root {
+  --background: #030712;
+  --foreground: #f8fafc;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  overflow: hidden;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Gradient background mesh */
+.gradient-mesh {
+  background:
+    radial-gradient(ellipse at 15% 50%, rgba(139, 92, 246, 0.07) 0%, transparent 50%),
+    radial-gradient(ellipse at 85% 15%, rgba(6, 182, 212, 0.05) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 85%, rgba(99, 102, 241, 0.04) 0%, transparent 50%),
+    var(--background);
+}
+
+/* Spinning gradient for mic ring */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Pulse animation for listening state */
+@keyframes pulse-soft {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.05); }
+}
+
+/* Gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, #a78bfa 0%, #06b6d4 50%, #8b5cf6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Subtle ambient animation */
+@keyframes ambient-shift {
+  0%, 100% { opacity: 0.5; transform: translate(0, 0) scale(1); }
+  33% { opacity: 0.7; transform: translate(10px, -10px) scale(1.05); }
+  66% { opacity: 0.4; transform: translate(-10px, 5px) scale(0.95); }
+}
+
+.ambient-orb {
+  animation: ambient-shift 8s ease-in-out infinite;
+}
+
+/* Glass effect */
+.glass {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
