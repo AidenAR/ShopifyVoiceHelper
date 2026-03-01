@@ -178,9 +178,59 @@
 - Auto-restarts listening after each command
 - Works alongside the manual mic tap
 
+## Order Status Tracking
+
+- **Check order status** — "Where's order #1002?", "Show my recent orders"
+- Fetches recent orders from Shopify Admin API
+- Shows order number, customer name, date, items, total, fulfillment status, and financial status
+- Color-coded fulfillment badges (fulfilled = green, unfulfilled = amber)
+
+## Refund Processing
+
+- **Voice refunds** — "Refund order #1001", "Process a refund on my latest order"
+- Calculates refund amount via Shopify Admin API
+- Processes full refund with customer notification
+- Restocks returned items automatically
+
+## Product SEO Optimization
+
+- **AI-powered SEO** — "Optimize the hoodie's SEO", "Improve SEO for the mug"
+- Gemini analyzes the product and generates optimized meta title (under 60 chars) and meta description (under 160 chars)
+- Updates the product directly in Shopify
+- Before/after comparison card showing old vs. new SEO content
+
+## Social Media Caption Generator
+
+- **Voice-powered captions** — "Write an Instagram caption for the hoodie", "Tweet about the mug"
+- Supports Instagram, Facebook, Twitter, and TikTok
+- Gemini generates platform-appropriate captions with trending hashtags
+- Copy-ready output with hashtag chips
+
+## Smart Pricing Suggestions
+
+- **AI pricing advisor** — "What should I price this backpack at?", "Pricing suggestion for the hoodie"
+- Analyzes store-wide price range and average
+- Gemini provides a suggested price with reasoning
+- Dashboard card with current price, suggestion, store average, and price range
+
+## Revenue Forecasting
+
+- **Predict future revenue** — "Predict my revenue for next month", "Revenue forecast"
+- Analyzes order history and calculates monthly trends
+- Displays predicted next month's revenue with trend indicator (growing/declining/stable)
+- Monthly revenue breakdown chart
+- Average order value calculation
+
+## Ad Copy Generator
+
+- **Voice-powered ads** — "Create a Facebook ad for the hoodie", "Write a Google ad for the mug"
+- Supports Facebook, Google, and Instagram platforms
+- Gemini generates headline, body copy, and CTA
+- Formatted ad preview card with platform badge
+
 ## Intent Recognition
 
-Gemini 2.5 Flash classifies every user message into one of 17 actions:
+Gemini 2.5 Flash classifies every user message into one of 24 actions:
 
 | Intent | Trigger Examples |
 |--------|-----------------|
@@ -200,6 +250,13 @@ Gemini 2.5 Flash classifies every user message into one of 17 actions:
 | `describe_search` | "find me something like a red winter jacket" |
 | `restock` | "what should I restock?", "reorder suggestions" |
 | `create_collection` | "create a Summer Sale collection with hoodies and shirts" |
+| `order_status` | "where's my order?", "show recent orders" |
+| `refund` | "refund order #1001", "process a refund" |
+| `seo_optimize` | "optimize the hoodie's SEO" |
+| `social_caption` | "write an Instagram caption for the hoodie" |
+| `pricing_suggestion` | "what should I price this at?" |
+| `revenue_forecast` | "predict next month's revenue" |
+| `generate_ad` | "create a Facebook ad for the hoodie" |
 
 ## UI / UX
 
@@ -207,8 +264,8 @@ Gemini 2.5 Flash classifies every user message into one of 17 actions:
 - Framer Motion animations on all transitions
 - Responsive layout — works on desktop and mobile
 - Conversational chat interface with user/assistant bubbles
-- Rich response cards: product grids, analytics dashboards, inventory summaries, customer lists, discount badges, fulfillment confirmations, price and inventory update cards, product deletion confirmations, bulk price tables, side-by-side comparisons, restock urgency dashboards, collection creation cards
-- Quick-start prompt buttons on the welcome screen (updated to showcase new features)
+- Rich response cards: product grids, analytics dashboards, inventory summaries, customer lists, discount badges, fulfillment confirmations, price and inventory update cards, product deletion confirmations, bulk price tables, side-by-side comparisons, restock urgency dashboards, collection creation cards, order status tables, refund confirmations, SEO before/after cards, social caption cards with hashtags, pricing suggestion dashboards, revenue forecast charts, ad copy preview cards
+- Quick-start prompt buttons on the welcome screen
 - "Hey Ivy" wake word toggle button in the header
 - Conversation export/share button in the header
 - Personalized "Welcome Back" screen with shopper memory summary

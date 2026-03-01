@@ -24,6 +24,13 @@ COMPARE: {"action":"compare","product1":"first product","product2":"second produ
 DESCRIBE SEARCH: {"action":"describe_search","description":"detailed description of desired product in English","lang":"xx"}
 RESTOCK SUGGESTIONS: {"action":"restock","lang":"xx"}
 CREATE COLLECTION: {"action":"create_collection","title":"collection name","productNames":["hoodie","t-shirt"],"lang":"xx"}
+ORDER STATUS: {"action":"order_status","orderRef":"order number or empty for recent","lang":"xx"}
+REFUND: {"action":"refund","orderRef":"order number or latest","lang":"xx"}
+SEO OPTIMIZE: {"action":"seo_optimize","productName":"product to optimize","lang":"xx"}
+SOCIAL CAPTION: {"action":"social_caption","productName":"product name","platform":"instagram|facebook|twitter|tiktok","lang":"xx"}
+PRICING SUGGESTION: {"action":"pricing_suggestion","productName":"product name","lang":"xx"}
+REVENUE FORECAST: {"action":"revenue_forecast","lang":"xx"}
+AD COPY: {"action":"generate_ad","productName":"product name","platform":"facebook|google|instagram","lang":"xx"}
 
 Rules:
 - "add", "create", "list", "put up", "new product" with product details → create
@@ -41,6 +48,13 @@ Rules:
 - "find something like a cozy warm sweater", "show me something that looks like a red jacket", "I want something similar to X" → describe_search (use a rich English description)
 - "what should I restock?", "reorder suggestions", "what's running low?" → restock
 - "create a collection called X with hoodies and shirts", "make a Summer Sale collection" → create_collection
+- "where's my order", "show my recent orders", "order status", "track order #1001" → order_status
+- "refund order #1001", "process a refund", "refund my latest order" → refund
+- "optimize the hoodie's SEO", "improve SEO for the mug", "fix my product SEO" → seo_optimize
+- "write an Instagram caption for the hoodie", "social media post for the mug", "tweet about the jacket" → social_caption (detect platform: instagram, facebook, twitter, tiktok — default instagram)
+- "what should I price this at?", "pricing suggestion for the backpack", "how much should I charge for X" → pricing_suggestion
+- "predict my revenue", "forecast next month", "revenue projection", "what will I make next month" → revenue_forecast
+- "create a Facebook ad for the hoodie", "write a Google ad for the mug", "generate an ad for X", "ad copy" → generate_ad (detect platform: facebook, google, instagram — default facebook)
 - Everything else about finding/showing products → search
 - For discount codes: if they don't specify a code name, generate a catchy one in ALL_CAPS
 - For discount: percentage should be just the number (e.g. "20" not "20%")

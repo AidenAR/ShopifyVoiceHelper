@@ -117,6 +117,8 @@ export default function Home() {
         inventoryUpdate: data.inventoryUpdate, inventorySummary: data.inventorySummary,
         deletedProduct: data.deletedProduct, fulfillment: data.fulfillment, customers: data.customers,
         bulkPrice: data.bulkPrice, comparison: data.comparison, restock: data.restock, collection: data.collection,
+        orderStatus: data.orderStatus, refund: data.refund, seo: data.seo, socialCaption: data.socialCaption,
+        pricingSuggestion: data.pricingSuggestion, revenueForecast: data.revenueForecast, adCopy: data.adCopy,
       };
 
       setMessages(prev => [...prev, assistantMessage]);

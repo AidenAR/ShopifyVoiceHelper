@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parseIntent, generateResponse } from '@/lib/gemini';
 import { searchProducts } from '@/lib/shopify';
-import { createProduct, updateProductPrice, getStoreAnalytics, createDiscountCode, updateInventory, getInventorySummary, deleteProduct, fulfillOrder, getCustomers, bulkPriceUpdate, compareProducts, getRestockSuggestions, createCollection } from '@/lib/shopify-admin';
+import { createProduct, updateProductPrice, getStoreAnalytics, createDiscountCode, updateInventory, getInventorySummary, deleteProduct, fulfillOrder, getCustomers, bulkPriceUpdate, compareProducts, getRestockSuggestions, createCollection, getOrderStatus, refundOrder, optimizeSEO, generateSocialCaption, getPricingSuggestion, getRevenueForecast, generateAdCopy } from '@/lib/shopify-admin';
 import { saveShoppingEvent } from '@/lib/backboard';
 
 function emptyResponse(message: string) {
-  return { message, products: [], created: null, priceUpdate: null, analytics: null, discount: null, addedToCart: null, inventoryUpdate: null, inventorySummary: null, deletedProduct: null, fulfillment: null, customers: null, bulkPrice: null, comparison: null, restock: null, collection: null };
+  return { message, products: [], created: null, priceUpdate: null, analytics: null, discount: null, addedToCart: null, inventoryUpdate: null, inventorySummary: null, deletedProduct: null, fulfillment: null, customers: null, bulkPrice: null, comparison: null, restock: null, collection: null, orderStatus: null, refund: null, seo: null, socialCaption: null, pricingSuggestion: null, revenueForecast: null, adCopy: null };
 }
 
 function rememberEvent(event: string) {
@@ -269,6 +269,104 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ...emptyResponse(message), collection: result });
       } catch (err: any) {
         return NextResponse.json(emptyResponse(`Couldn't create collection: ${err.message}`));
+      }
+    }
+
+    // --- ORDER STATUS ---
+    if (intent.action === 'order_status') {
+      try {
+        const result = await getOrderStatus(intent.orderRef);
+        const context = `Found ${result.totalOrders} orders. Recent: ${result.orders.slice(0, 3).map((o: { orderNumber: number; status: string; totalPrice: string }) => `#${o.orderNumber} (${o.status}, $${o.totalPrice})`).join(', ')}`;
+        let message = `Here are your recent orders.`;
+        try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
+        rememberEvent(`Shopper checked order status`);
+        return NextResponse.json({ ...emptyResponse(message), orderStatus: result });
+      } catch (err: any) {
+        return NextResponse.json(emptyResponse(`Couldn't fetch orders: ${err.message}`));
+      }
+    }
+
+    // --- REFUND ---
+    if (intent.action === 'refund') {
+      try {
+        const result = await refundOrder(intent.orderRef);
+        const context = `Refunded order #${result.orderNumber} — $${result.refundAmount} for ${result.lineItems} items`;
+        let message = `Done! Refunded $${result.refundAmount} for order #${result.orderNumber}.`;
+        try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
+        rememberEvent(`Shopper refunded order #${result.orderNumber} for $${result.refundAmount}`);
+        return NextResponse.json({ ...emptyResponse(message), refund: result });
+      } catch (err: any) {
+        return NextResponse.json(emptyResponse(`Couldn't process refund: ${err.message}`));
+      }
+    }
+
+    // --- SEO OPTIMIZE ---
+    if (intent.action === 'seo_optimize') {
+      try {
+        const result = await optimizeSEO(intent.productName);
+        const context = `Optimized SEO for "${result.title}". New title: "${result.newMetaTitle}", new description: "${result.newMetaDescription}"`;
+        let message = `Done! I've optimized the SEO for ${result.title}.`;
+        try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
+        rememberEvent(`Shopper optimized SEO for "${result.title}"`);
+        return NextResponse.json({ ...emptyResponse(message), seo: result });
+      } catch (err: any) {
+        return NextResponse.json(emptyResponse(`Couldn't optimize SEO: ${err.message}`));
+      }
+    }
+
+    // --- SOCIAL CAPTION ---
+    if (intent.action === 'social_caption') {
+      try {
+        const result = await generateSocialCaption(intent.productName, intent.platform || 'instagram');
+        const context = `Generated ${result.platform} caption for "${result.productTitle}"`;
+        let message = `Here's your ${result.platform} caption for ${result.productTitle}!`;
+        try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
+        rememberEvent(`Shopper generated ${result.platform} caption for "${result.productTitle}"`);
+        return NextResponse.json({ ...emptyResponse(message), socialCaption: result });
+      } catch (err: any) {
+        return NextResponse.json(emptyResponse(`Couldn't generate caption: ${err.message}`));
+      }
+    }
+
+    // --- PRICING SUGGESTION ---
+    if (intent.action === 'pricing_suggestion') {
+      try {
+        const result = await getPricingSuggestion(intent.productName);
+        const context = `Pricing suggestion for "${result.productTitle}": current $${result.currentPrice}, suggested $${result.suggestedPrice}. ${result.reasoning}`;
+        let message = `I'd suggest pricing ${result.productTitle} at $${result.suggestedPrice}.`;
+        try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
+        rememberEvent(`Shopper got pricing suggestion for "${result.productTitle}": $${result.suggestedPrice}`);
+        return NextResponse.json({ ...emptyResponse(message), pricingSuggestion: result });
+      } catch (err: any) {
+        return NextResponse.json(emptyResponse(`Couldn't generate pricing suggestion: ${err.message}`));
+      }
+    }
+
+    // --- REVENUE FORECAST ---
+    if (intent.action === 'revenue_forecast') {
+      try {
+        const result = await getRevenueForecast();
+        const context = `Revenue forecast: this month $${result.currentMonthRevenue}, last month $${result.lastMonthRevenue}, predicted next month $${result.predictedNextMonth}. Trend: ${result.trend}. Avg order: $${result.avgOrderValue}`;
+        let message = `Based on your data, next month's projected revenue is $${result.predictedNextMonth}.`;
+        try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
+        rememberEvent(`Shopper checked revenue forecast: predicted $${result.predictedNextMonth} next month`);
+        return NextResponse.json({ ...emptyResponse(message), revenueForecast: result });
+      } catch (err: any) {
+        return NextResponse.json(emptyResponse(`Couldn't generate forecast: ${err.message}`));
+      }
+    }
+
+    // --- AD COPY ---
+    if (intent.action === 'generate_ad') {
+      try {
+        const result = await generateAdCopy(intent.productName, intent.platform || 'facebook');
+        const context = `Generated ${result.platform} ad for "${result.productTitle}": headline "${result.headline}"`;
+        let message = `Here's your ${result.platform} ad for ${result.productTitle}!`;
+        try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
+        rememberEvent(`Shopper generated ${result.platform} ad for "${result.productTitle}"`);
+        return NextResponse.json({ ...emptyResponse(message), adCopy: result });
+      } catch (err: any) {
+        return NextResponse.json(emptyResponse(`Couldn't generate ad copy: ${err.message}`));
       }
     }
 

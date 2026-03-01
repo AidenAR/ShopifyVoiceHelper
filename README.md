@@ -1,29 +1,30 @@
-# ShopifyVoice — AI Voice Shopping Assistant
+# Ivy — AI Voice Store Assistant
 
-> Built at **ListenHacks 2025** — an invite-only hackday exploring the future of voice, audio, and AI.
+> Built at **ListenHacks 2026** — an invite-only hackday exploring the future of voice, audio, and AI.
+> **Live:** https://ivyshopify-production.up.railway.app/
 
-ShopifyVoice is a voice-first Shopify store management tool. Speak naturally to search products, create listings with AI-generated images, manage prices and inventory, view analytics, create discount codes, fulfill orders, look up customers, compare products side by side, run bulk price operations, get restock suggestions, create collections, and add items to a real Shopify cart — all hands-free with "Hey Ivy" wake word, in any language.
+Ivy is a voice-first Shopify store management assistant with **24 voice intents**. Speak naturally to search products, create listings with AI-generated images, manage prices and inventory, optimize SEO, generate social media captions and ad copy, forecast revenue, get pricing suggestions, fulfill orders, process refunds, and more — all hands-free with "Hey Ivy" wake word, in any language.
 
 ## Demo
 
 Tap the mic (or type) and say things like:
 
-- *"Show me a hoodie"*
-- *"Add a vintage denim jacket for $89"* — creates the product **and** generates a product photo with AI
-- *"Change the price of all hoodies to $60"*
-- *"Set hoodie stock to 200"*
-- *"Delete the leather wallet"*
-- *"How are my sales?"*
-- *"How many customers do I have?"*
-- *"Fulfill my latest order"*
-- *"Create a 20% off code called LISTENHACKS"*
-- *"Put a discount on that hoodie we just talked about"* — understands context
-- *"Add the hoodie to my cart"*
-- *"Compare the hoodie and the mug"* — side-by-side comparison
+- *"Show me a hoodie"* — product search
+- *"Create a leather jacket for $120"* — creates product with AI-generated image
+- *"Change the price of all hoodies to $60"* — single price edit
 - *"Set all products to 10% off"* — bulk price operations
-- *"What should I restock?"* — smart reorder suggestions
-- *"Find me something like a cozy warm sweater"* — description-based search
-- *"Create a Summer Sale collection with hoodies and t-shirts"* — voice collections
+- *"What should I price the hoodie at?"* — AI pricing suggestion with reasoning
+- *"Set hoodie stock to 200"* / *"What should I restock?"* — inventory management
+- *"How are my sales?"* — real-time analytics
+- *"Predict my revenue for next month"* — revenue forecasting
+- *"Optimize the hoodie's SEO"* — AI-powered meta title & description rewrite
+- *"Write an Instagram caption for the hoodie"* — social media captions with hashtags
+- *"Create a Facebook ad for the hoodie"* — full ad copy (headline, body, CTA)
+- *"Show my recent orders"* / *"Refund order #1001"* — order tracking & refunds
+- *"Compare the hoodie and the mug"* — side-by-side comparison
+- *"Create a Summer Sale collection with hoodies"* — voice-powered collections
+- *"Create a 20% off code called LISTENHACKS"* — discount codes
+- *"Put a discount on that hoodie we just talked about"* — context-aware conversations
 - *"Hey Ivy, show me hoodies"* — hands-free wake word activation
 - *"Montre-moi des chandails"* — works in French, Spanish, and 25+ other languages
 
@@ -35,7 +36,7 @@ Tap the mic (or type) and say things like:
 | Language | TypeScript |
 | Styling | Tailwind CSS 4 + Framer Motion |
 | Voice → Text | Google Gemini 2.5 Flash (audio transcription) |
-| NLU / Intent | Google Gemini 2.5 Flash (17 intents, context-aware) |
+| NLU / Intent | Google Gemini 2.5 Flash (24 intents, context-aware) |
 | Image Generation | Google Gemini 2.0 Flash Image Generation |
 | Text → Speech | ElevenLabs Multilingual v2 TTS |
 | Persistent Memory | Backboard.io (cross-session shopper memory) |
@@ -47,7 +48,7 @@ Tap the mic (or type) and say things like:
 ```
 Browser (mic) → MediaRecorder → /api/transcribe (Gemini STT)
                                         ↓
-                                  /api/chat (Gemini NLU — 17 intents)
+                                  /api/chat (Gemini NLU — 24 intents)
                           ↓         ↓          ↓          ↓
                     Storefront   Admin API   Gemini      Backboard.io
                     (search,     (CRUD,      (product    (persistent
@@ -128,7 +129,7 @@ src/
 │   ├── ProductCard.tsx       # Product display with Add to Cart
 │   └── ProductGrid.tsx       # Animated product grid
 ├── lib/
-│   ├── gemini.ts             # Intent parsing + response generation (17 intents)
+│   ├── gemini.ts             # Intent parsing + response generation (24 intents)
 │   ├── shopify.ts            # Storefront API client (search, cart)
 │   ├── shopify-admin.ts      # Admin API client (full CRUD, inventory, orders, customers)
 │   ├── backboard.ts          # Backboard.io persistent memory client
@@ -146,7 +147,7 @@ src/
 
 ## Team
 
-Built by Aiden at ListenHacks, February 2025.
+Built by Aiden at ListenHacks, February 2026.
 
 ## License
 

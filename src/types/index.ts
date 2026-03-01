@@ -96,6 +96,59 @@ export interface CollectionResult {
   productsAdded: string[];
 }
 
+export interface OrderStatus {
+  orders: { orderNumber: number; status: string; fulfillmentStatus: string; financialStatus: string; customerName: string; totalPrice: string; itemCount: number; createdAt: string }[];
+  totalOrders: number;
+}
+
+export interface RefundResult {
+  orderNumber: number;
+  refundAmount: string;
+  lineItems: number;
+}
+
+export interface SEOResult {
+  title: string;
+  oldMetaTitle: string;
+  newMetaTitle: string;
+  oldMetaDescription: string;
+  newMetaDescription: string;
+}
+
+export interface SocialCaption {
+  platform: string;
+  productTitle: string;
+  caption: string;
+  hashtags: string[];
+}
+
+export interface PricingSuggestion {
+  productTitle: string;
+  currentPrice: string;
+  suggestedPrice: string;
+  reasoning: string;
+  storeAvgPrice: string;
+  storePriceRange: string;
+}
+
+export interface RevenueForecast {
+  currentMonthRevenue: string;
+  lastMonthRevenue: string;
+  predictedNextMonth: string;
+  trend: string;
+  avgOrderValue: string;
+  totalOrders: number;
+  monthlyBreakdown: { month: string; revenue: string }[];
+}
+
+export interface AdCopy {
+  platform: string;
+  productTitle: string;
+  headline: string;
+  body: string;
+  cta: string;
+}
+
 export interface ChatResponse {
   message: string;
   products: Product[];
@@ -113,6 +166,13 @@ export interface ChatResponse {
   comparison: ComparisonResult | null;
   restock: RestockSuggestions | null;
   collection: CollectionResult | null;
+  orderStatus: OrderStatus | null;
+  refund: RefundResult | null;
+  seo: SEOResult | null;
+  socialCaption: SocialCaption | null;
+  pricingSuggestion: PricingSuggestion | null;
+  revenueForecast: RevenueForecast | null;
+  adCopy: AdCopy | null;
 }
 
 export interface Message {
@@ -134,6 +194,13 @@ export interface Message {
   comparison?: ComparisonResult | null;
   restock?: RestockSuggestions | null;
   collection?: CollectionResult | null;
+  orderStatus?: OrderStatus | null;
+  refund?: RefundResult | null;
+  seo?: SEOResult | null;
+  socialCaption?: SocialCaption | null;
+  pricingSuggestion?: PricingSuggestion | null;
+  revenueForecast?: RevenueForecast | null;
+  adCopy?: AdCopy | null;
 }
 
 export interface ChatRequest {

@@ -494,6 +494,325 @@ export async function getRestockSuggestions() {
   };
 }
 
+// --- Order Status ---
+
+export async function getOrderStatus(orderRef?: string) {
+  const res = await adminFetch('/orders.json?status=any&limit=10');
+  if (!res.ok) throw new Error('Failed to fetch orders');
+  const { orders } = await res.json();
+
+  if (!orders || orders.length === 0) throw new Error('No orders found');
+
+  let filteredOrders = orders;
+  if (orderRef) {
+    const num = orderRef.replace(/[^0-9]/g, '');
+    if (num) {
+      const found = orders.filter((o: any) => String(o.order_number) === num);
+      if (found.length > 0) filteredOrders = found;
+    }
+  }
+
+  return {
+    orders: filteredOrders.slice(0, 5).map((o: any) => ({
+      orderNumber: o.order_number,
+      status: o.cancelled_at ? 'Cancelled' : o.closed_at ? 'Closed' : 'Open',
+      fulfillmentStatus: o.fulfillment_status || 'Unfulfilled',
+      financialStatus: o.financial_status || 'Unknown',
+      customerName: o.customer ? `${o.customer.first_name || ''} ${o.customer.last_name || ''}`.trim() : 'Guest',
+      totalPrice: o.total_price,
+      itemCount: (o.line_items || []).length,
+      createdAt: o.created_at?.split('T')[0] || '',
+    })),
+    totalOrders: orders.length,
+  };
+}
+
+// --- Refund Order ---
+
+export async function refundOrder(orderRef?: string) {
+  const ordersRes = await adminFetch('/orders.json?status=any&limit=20');
+  if (!ordersRes.ok) throw new Error('Failed to fetch orders');
+  const { orders } = await ordersRes.json();
+
+  if (!orders || orders.length === 0) throw new Error('No orders found');
+
+  let order;
+  if (orderRef) {
+    const num = orderRef.replace(/[^0-9]/g, '');
+    order = orders.find((o: any) => String(o.order_number) === num || String(o.id) === num);
+  }
+  if (!order) order = orders[0];
+
+  const refundLineItems = (order.line_items || []).map((li: any) => ({
+    line_item_id: li.id,
+    quantity: li.quantity,
+    restock_type: 'return',
+  }));
+
+  const calcRes = await adminFetch(`/orders/${order.id}/refunds/calculate.json`, {
+    method: 'POST',
+    body: JSON.stringify({ refund: { refund_line_items: refundLineItems } }),
+  });
+
+  if (!calcRes.ok) throw new Error(`Refund calculation failed: ${await calcRes.text()}`);
+  const calcData = await calcRes.json();
+
+  const transactions = (calcData.refund?.transactions || []).map((t: any) => ({
+    parent_id: t.parent_id,
+    amount: t.amount,
+    kind: 'refund',
+    gateway: t.gateway,
+  }));
+
+  const refundRes = await adminFetch(`/orders/${order.id}/refunds.json`, {
+    method: 'POST',
+    body: JSON.stringify({
+      refund: {
+        notify: true,
+        refund_line_items: refundLineItems,
+        transactions,
+      },
+    }),
+  });
+
+  if (!refundRes.ok) throw new Error(`Refund failed: ${await refundRes.text()}`);
+
+  return {
+    orderNumber: order.order_number,
+    refundAmount: order.total_price,
+    lineItems: (order.line_items || []).length,
+  };
+}
+
+// --- SEO Optimization ---
+
+export async function optimizeSEO(productName: string) {
+  const products = await fetchAllProducts();
+  const product = fuzzyFindProduct(products, productName);
+  if (!product) throw new Error(`Product "${productName}" not found`);
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('Gemini API key not configured');
+
+  const { GoogleGenerativeAI } = await import('@google/generative-ai');
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+
+  const seoPrompt = `You are an SEO expert for e-commerce. Generate optimized SEO meta title and meta description for this product.
+
+Product: ${product.title}
+Type: ${product.product_type || 'General'}
+Description: ${product.body_html?.replace(/<[^>]*>/g, '') || 'No description'}
+Price: $${product.variants?.[0]?.price || '0'}
+
+Return ONLY valid JSON:
+{"metaTitle":"optimized title (under 60 chars)","metaDescription":"optimized description (under 160 chars)"}`;
+
+  const result = await model.generateContent(seoPrompt);
+  const text = result.response.text().trim();
+  const jsonMatch = text.match(/\{[\s\S]*?\}/);
+  if (!jsonMatch) throw new Error('Failed to generate SEO content');
+
+  const seo = JSON.parse(jsonMatch[0]);
+
+  const oldMetaTitle = product.metafields_global_title_tag || product.title;
+  const oldMetaDescription = product.metafields_global_description_tag || '';
+
+  await adminFetch(`/products/${product.id}.json`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      product: {
+        id: product.id,
+        metafields_global_title_tag: seo.metaTitle,
+        metafields_global_description_tag: seo.metaDescription,
+      },
+    }),
+  });
+
+  return {
+    title: product.title,
+    oldMetaTitle,
+    newMetaTitle: seo.metaTitle,
+    oldMetaDescription,
+    newMetaDescription: seo.metaDescription,
+  };
+}
+
+// --- Social Caption Generator ---
+
+export async function generateSocialCaption(productName: string, platform: string) {
+  const products = await fetchAllProducts();
+  const product = fuzzyFindProduct(products, productName);
+  if (!product) throw new Error(`Product "${productName}" not found`);
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('Gemini API key not configured');
+
+  const { GoogleGenerativeAI } = await import('@google/generative-ai');
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+
+  const captionPrompt = `Write a ${platform} post for this product. Be engaging, trendy, and match the platform's style.
+
+Product: ${product.title}
+Type: ${product.product_type || 'General'}
+Price: $${product.variants?.[0]?.price || '0'}
+Description: ${product.body_html?.replace(/<[^>]*>/g, '') || ''}
+
+Return ONLY valid JSON:
+{"caption":"the post text (no hashtags here)","hashtags":["tag1","tag2","tag3","tag4","tag5"]}`;
+
+  const result = await model.generateContent(captionPrompt);
+  const text = result.response.text().trim();
+  const jsonMatch = text.match(/\{[\s\S]*?\}/);
+  if (!jsonMatch) throw new Error('Failed to generate caption');
+
+  const data = JSON.parse(jsonMatch[0]);
+
+  return {
+    platform,
+    productTitle: product.title,
+    caption: data.caption,
+    hashtags: data.hashtags || [],
+  };
+}
+
+// --- Pricing Suggestion ---
+
+export async function getPricingSuggestion(productName: string) {
+  const products = await fetchAllProducts();
+  const product = fuzzyFindProduct(products, productName);
+  if (!product) throw new Error(`Product "${productName}" not found`);
+
+  const prices = products.flatMap((p: any) => (p.variants || []).map((v: any) => parseFloat(v.price)));
+  const avgPrice = prices.length > 0 ? (prices.reduce((a: number, b: number) => a + b, 0) / prices.length) : 0;
+  const minPrice = Math.min(...prices);
+  const maxPrice = Math.max(...prices);
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('Gemini API key not configured');
+
+  const { GoogleGenerativeAI } = await import('@google/generative-ai');
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+
+  const pricingPrompt = `You are a pricing strategist. Suggest an optimal price for this product.
+
+Product: ${product.title}
+Current Price: $${product.variants?.[0]?.price || '0'}
+Type: ${product.product_type || 'General'}
+Store Average Price: $${avgPrice.toFixed(2)}
+Store Price Range: $${minPrice.toFixed(2)} — $${maxPrice.toFixed(2)}
+Total Products in Store: ${products.length}
+
+Return ONLY valid JSON:
+{"suggestedPrice":"XX.XX","reasoning":"1-2 sentence explanation"}`;
+
+  const result = await model.generateContent(pricingPrompt);
+  const text = result.response.text().trim();
+  const jsonMatch = text.match(/\{[\s\S]*?\}/);
+  if (!jsonMatch) throw new Error('Failed to generate pricing suggestion');
+
+  const data = JSON.parse(jsonMatch[0]);
+
+  return {
+    productTitle: product.title,
+    currentPrice: product.variants?.[0]?.price || '0',
+    suggestedPrice: data.suggestedPrice,
+    reasoning: data.reasoning,
+    storeAvgPrice: avgPrice.toFixed(2),
+    storePriceRange: `$${minPrice.toFixed(2)} — $${maxPrice.toFixed(2)}`,
+  };
+}
+
+// --- Revenue Forecast ---
+
+export async function getRevenueForecast() {
+  const res = await adminFetch('/orders.json?status=any&limit=250');
+  if (!res.ok) throw new Error('Failed to fetch orders');
+  const { orders } = await res.json();
+
+  const now = new Date();
+  const monthlyRevenue: Record<string, number> = {};
+
+  for (const order of orders || []) {
+    const date = new Date(order.created_at);
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    monthlyRevenue[key] = (monthlyRevenue[key] || 0) + parseFloat(order.total_price || '0');
+  }
+
+  const sortedMonths = Object.entries(monthlyRevenue).sort(([a], [b]) => a.localeCompare(b));
+  const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const lastKey = `${now.getFullYear()}-${String(now.getMonth()).padStart(2, '0')}`;
+
+  const currentMonthRev = monthlyRevenue[currentKey] || 0;
+  const lastMonthRev = monthlyRevenue[lastKey] || 0;
+
+  const recentRevenues = sortedMonths.slice(-3).map(([, v]) => v);
+  const avgRevenue = recentRevenues.length > 0 ? recentRevenues.reduce((a, b) => a + b, 0) / recentRevenues.length : 0;
+
+  let trend = 'stable';
+  if (recentRevenues.length >= 2) {
+    const change = recentRevenues[recentRevenues.length - 1] - recentRevenues[0];
+    if (change > 0) trend = 'growing';
+    else if (change < 0) trend = 'declining';
+  }
+
+  const totalOrders = (orders || []).length;
+  const totalRev = (orders || []).reduce((s: number, o: any) => s + parseFloat(o.total_price || '0'), 0);
+  const avgOrderValue = totalOrders > 0 ? totalRev / totalOrders : 0;
+
+  return {
+    currentMonthRevenue: currentMonthRev.toFixed(2),
+    lastMonthRevenue: lastMonthRev.toFixed(2),
+    predictedNextMonth: avgRevenue.toFixed(2),
+    trend,
+    avgOrderValue: avgOrderValue.toFixed(2),
+    totalOrders,
+    monthlyBreakdown: sortedMonths.slice(-6).map(([month, revenue]) => ({ month, revenue: revenue.toFixed(2) })),
+  };
+}
+
+// --- Ad Copy Generator ---
+
+export async function generateAdCopy(productName: string, platform: string) {
+  const products = await fetchAllProducts();
+  const product = fuzzyFindProduct(products, productName);
+  if (!product) throw new Error(`Product "${productName}" not found`);
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('Gemini API key not configured');
+
+  const { GoogleGenerativeAI } = await import('@google/generative-ai');
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+
+  const adPrompt = `Write a ${platform} ad for this product. Be compelling and conversion-focused.
+
+Product: ${product.title}
+Type: ${product.product_type || 'General'}
+Price: $${product.variants?.[0]?.price || '0'}
+Description: ${product.body_html?.replace(/<[^>]*>/g, '') || ''}
+
+Return ONLY valid JSON:
+{"headline":"short punchy headline (under 40 chars)","body":"ad body text (2-3 sentences, compelling)","cta":"call to action text (under 20 chars)"}`;
+
+  const result = await model.generateContent(adPrompt);
+  const text = result.response.text().trim();
+  const jsonMatch = text.match(/\{[\s\S]*?\}/);
+  if (!jsonMatch) throw new Error('Failed to generate ad copy');
+
+  const data = JSON.parse(jsonMatch[0]);
+
+  return {
+    platform,
+    productTitle: product.title,
+    headline: data.headline,
+    body: data.body,
+    cta: data.cta,
+  };
+}
+
 // --- Create Collection ---
 
 export async function createCollection(title: string, productNames: string[]) {
