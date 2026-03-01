@@ -266,7 +266,7 @@ function InfoCard({ color, icon, title, subtitle }: { color: string; icon: strin
   const iconBgMap: Record<string, string> = { green: 'bg-[#e8f5e9] text-[#008060]', amber: 'bg-amber-50 text-amber-600', blue: 'bg-[#5C6AC4]/10 text-[#5C6AC4]', red: 'bg-red-50 text-red-500' };
   const subColorMap: Record<string, string> = { green: 'text-[#008060]', amber: 'text-amber-600', blue: 'text-[#5C6AC4]', red: 'text-red-500' };
 
-  const icons: Record<string, JSX.Element> = {
+  const icons: Record<string, React.ReactElement> = {
     plus: <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M12 4v16m8-8H4" /></svg>,
     tag: <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z" /><line x1="7" y1="7" x2="7.01" y2="7" /></svg>,
     cart: <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" /></svg>,
