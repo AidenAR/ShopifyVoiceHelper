@@ -3,13 +3,13 @@ import { textToSpeechStream } from '@/lib/elevenlabs';
 
 export async function POST(req: NextRequest) {
   try {
-    const { text } = await req.json();
+    const { text, lang } = await req.json();
 
     if (!text || typeof text !== 'string') {
       return new Response('Missing text', { status: 400 });
     }
 
-    const elevenLabsRes = await textToSpeechStream(text);
+    const elevenLabsRes = await textToSpeechStream(text, lang || 'en');
 
     return new Response(elevenLabsRes.body, {
       headers: {

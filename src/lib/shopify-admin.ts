@@ -19,10 +19,11 @@ function adminFetch(endpoint: string, options: RequestInit = {}) {
 
 async function generateProductImage(title: string, description: string): Promise<Buffer | null> {
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return null;
+  if (!apiKey) { console.log('[IMG] No API key'); return null; }
 
   try {
     const prompt = `Professional e-commerce product photo of ${title}. ${description || ''}. Clean white background, studio lighting, high quality product photography.`;
+    console.log('[IMG] Generating image for:', title);
 
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp-image-generation:generateContent?key=${apiKey}`,
@@ -33,19 +34,27 @@ async function generateProductImage(title: string, description: string): Promise
           contents: [{ parts: [{ text: `Generate an image: ${prompt}` }] }],
           generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
         }),
-        signal: AbortSignal.timeout(30000),
+        signal: AbortSignal.timeout(45000),
       }
     );
 
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.log('[IMG] Gemini returned', res.status, await res.text().catch(() => ''));
+      return null;
+    }
     const data = await res.json();
 
     const parts = data.candidates?.[0]?.content?.parts || [];
     const imagePart = parts.find((p: any) => p.inlineData?.mimeType?.startsWith('image/'));
-    if (!imagePart) return null;
+    if (!imagePart) {
+      console.log('[IMG] No image part in response. Parts:', parts.map((p: any) => Object.keys(p)));
+      return null;
+    }
 
+    console.log('[IMG] Got image, size:', imagePart.inlineData.data.length, 'chars');
     return Buffer.from(imagePart.inlineData.data, 'base64');
-  } catch {
+  } catch (err) {
+    console.error('[IMG] Generation failed:', err);
     return null;
   }
 }

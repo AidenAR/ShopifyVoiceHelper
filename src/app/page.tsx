@@ -40,13 +40,13 @@ export default function Home() {
       .finally(() => setMemoryLoading(false));
   }, []);
 
-  const playTTS = useCallback(async (text: string) => {
+  const playTTS = useCallback(async (text: string, lang?: string) => {
     try {
       setMicState('speaking');
       const res = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, lang: lang || 'en' }),
       });
       if (!res.ok) { setMicState('idle'); return; }
       const blob = await res.blob();
@@ -123,7 +123,7 @@ export default function Home() {
 
       setMessages(prev => [...prev, assistantMessage]);
       setIsLoading(false);
-      await playTTS(data.message);
+      await playTTS(data.message, (data as any).lang || 'en');
     } catch (err) {
       console.error('Chat error:', err);
       setMessages(prev => [...prev, { id: genId(), role: 'assistant', content: "Sorry, I couldn't process that. Try again?" }]);

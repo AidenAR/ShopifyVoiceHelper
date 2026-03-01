@@ -4,8 +4,8 @@ import { searchProducts } from '@/lib/shopify';
 import { createProduct, updateProductPrice, getStoreAnalytics, createDiscountCode, updateInventory, getInventorySummary, deleteProduct, fulfillOrder, getCustomers, bulkPriceUpdate, compareProducts, getRestockSuggestions, createCollection, getOrderStatus, refundOrder, optimizeSEO, generateSocialCaption, getPricingSuggestion, getRevenueForecast, generateAdCopy } from '@/lib/shopify-admin';
 import { saveShoppingEvent } from '@/lib/backboard';
 
-function emptyResponse(message: string) {
-  return { message, products: [], created: null, priceUpdate: null, analytics: null, discount: null, addedToCart: null, inventoryUpdate: null, inventorySummary: null, deletedProduct: null, fulfillment: null, customers: null, bulkPrice: null, comparison: null, restock: null, collection: null, orderStatus: null, refund: null, seo: null, socialCaption: null, pricingSuggestion: null, revenueForecast: null, adCopy: null };
+function emptyResponse(message: string, lang = 'en') {
+  return { message, lang, products: [], created: null, priceUpdate: null, analytics: null, discount: null, addedToCart: null, inventoryUpdate: null, inventorySummary: null, deletedProduct: null, fulfillment: null, customers: null, bulkPrice: null, comparison: null, restock: null, collection: null, orderStatus: null, refund: null, seo: null, socialCaption: null, pricingSuggestion: null, revenueForecast: null, adCopy: null };
 }
 
 function rememberEvent(event: string) {
@@ -41,12 +41,12 @@ export async function POST(req: NextRequest) {
         try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
         rememberEvent(`Shopper added "${match.title}" to their cart`);
         return NextResponse.json({
-          ...emptyResponse(message),
+          ...emptyResponse(message, lang),
           addedToCart: { title: match.title, variantId: match.variantId },
         });
       } else {
         const message = `I couldn't find that product in what I showed you. Try searching for it first?`;
-        return NextResponse.json(emptyResponse(message));
+        return NextResponse.json(emptyResponse(message, lang));
       }
     }
 
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
         try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
         rememberEvent(`Shopper created a new product: "${created.title}" priced at $${created.price}`);
         return NextResponse.json({
-          ...emptyResponse(message),
+          ...emptyResponse(message, lang),
           created: { id: created.id, title: created.title, price: created.price, handle: created.handle, image: created.image },
         });
       } catch (err: any) {
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
         try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
         rememberEvent(`Shopper changed price of "${result.title}" from $${result.oldPrice} to $${result.newPrice}`);
         return NextResponse.json({
-          ...emptyResponse(message),
+          ...emptyResponse(message, lang),
           priceUpdate: { title: result.title, oldPrice: result.oldPrice, newPrice: result.newPrice },
         });
       } catch (err: any) {
@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
         try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
         rememberEvent(`Shopper checked store analytics: ${stats.totalOrders} orders, $${stats.totalRevenue} revenue, best seller: ${stats.bestSeller}`);
         return NextResponse.json({
-          ...emptyResponse(message),
+          ...emptyResponse(message, lang),
           analytics: stats,
         });
       } catch (err: any) {
@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
         try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
         rememberEvent(`Shopper created discount code "${result.code}" for ${result.percentage}% off`);
         return NextResponse.json({
-          ...emptyResponse(message),
+          ...emptyResponse(message, lang),
           discount: { code: result.code, percentage: result.percentage, description: result.description },
         });
       } catch (err: any) {
@@ -137,7 +137,7 @@ export async function POST(req: NextRequest) {
         let message = `Done! ${result.title} now has ${result.newQuantity} units in stock.`;
         try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
         rememberEvent(`Shopper updated inventory for "${result.title}" to ${result.newQuantity} units`);
-        return NextResponse.json({ ...emptyResponse(message), inventoryUpdate: result });
+        return NextResponse.json({ ...emptyResponse(message, lang), inventoryUpdate: result });
       } catch (err: any) {
         return NextResponse.json(emptyResponse(`Couldn't update inventory: ${err.message}`));
       }
@@ -150,7 +150,7 @@ export async function POST(req: NextRequest) {
         const context = `Inventory: ${summary.totalStock} total units across ${summary.totalProducts} products. ${summary.lowStock.length} low stock, ${summary.outOfStock.length} out of stock.`;
         let message = `You have ${summary.totalStock} units across ${summary.totalProducts} products.`;
         try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
-        return NextResponse.json({ ...emptyResponse(message), inventorySummary: summary });
+        return NextResponse.json({ ...emptyResponse(message, lang), inventorySummary: summary });
       } catch (err: any) {
         return NextResponse.json(emptyResponse("Couldn't check inventory right now. Try again?"));
       }
@@ -164,7 +164,7 @@ export async function POST(req: NextRequest) {
         let message = `Done! "${result.title}" has been removed from your store.`;
         try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
         rememberEvent(`Shopper deleted product "${result.title}" from the store`);
-        return NextResponse.json({ ...emptyResponse(message), deletedProduct: result });
+        return NextResponse.json({ ...emptyResponse(message, lang), deletedProduct: result });
       } catch (err: any) {
         return NextResponse.json(emptyResponse(`Couldn't delete product: ${err.message}`));
       }
@@ -178,7 +178,7 @@ export async function POST(req: NextRequest) {
         let message = `Order #${result.orderNumber} for ${result.customerName} is now fulfilled!`;
         try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
         rememberEvent(`Shopper fulfilled order #${result.orderNumber} for ${result.customerName}`);
-        return NextResponse.json({ ...emptyResponse(message), fulfillment: result });
+        return NextResponse.json({ ...emptyResponse(message, lang), fulfillment: result });
       } catch (err: any) {
         return NextResponse.json(emptyResponse(`Couldn't fulfill order: ${err.message}`));
       }
@@ -191,7 +191,7 @@ export async function POST(req: NextRequest) {
         const context = `Store has ${result.totalCustomers} customers. Recent: ${result.recentCustomers.map((c: { name: string; ordersCount: number; totalSpent: string }) => `${c.name} (${c.ordersCount} orders, $${c.totalSpent})`).join(', ')}`;
         let message = `You have ${result.totalCustomers} customers.`;
         try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
-        return NextResponse.json({ ...emptyResponse(message), customers: result });
+        return NextResponse.json({ ...emptyResponse(message, lang), customers: result });
       } catch (err: any) {
         return NextResponse.json(emptyResponse("Couldn't fetch customer data right now. Try again?"));
       }
@@ -205,7 +205,7 @@ export async function POST(req: NextRequest) {
         let message = `Done! Updated prices across ${result.productsUpdated} products.`;
         try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
         rememberEvent(`Shopper did bulk price update: ${intent.operation} ${intent.value} on ${result.productsUpdated} products`);
-        return NextResponse.json({ ...emptyResponse(message), bulkPrice: result });
+        return NextResponse.json({ ...emptyResponse(message, lang), bulkPrice: result });
       } catch (err: any) {
         return NextResponse.json(emptyResponse(`Couldn't do bulk price update: ${err.message}`));
       }
@@ -219,7 +219,7 @@ export async function POST(req: NextRequest) {
         let message = `Here's a side-by-side comparison of ${result.product1.title} and ${result.product2.title}.`;
         try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
         rememberEvent(`Shopper compared "${result.product1.title}" vs "${result.product2.title}"`);
-        return NextResponse.json({ ...emptyResponse(message), comparison: result });
+        return NextResponse.json({ ...emptyResponse(message, lang), comparison: result });
       } catch (err: any) {
         return NextResponse.json(emptyResponse(`Couldn't compare products: ${err.message}`));
       }
@@ -239,7 +239,7 @@ export async function POST(req: NextRequest) {
       if (products.length > 0) {
         rememberEvent(`Shopper searched by description: "${searchQuery}" and found: ${products.map(p => p.title).join(', ')}`);
       }
-      return NextResponse.json({ ...emptyResponse(message), products });
+      return NextResponse.json({ ...emptyResponse(message, lang), products });
     }
 
     // --- RESTOCK SUGGESTIONS ---
@@ -252,7 +252,7 @@ export async function POST(req: NextRequest) {
           : 'All your products are well stocked!';
         try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
         rememberEvent(`Shopper checked restock suggestions: ${result.urgentCount} urgent, ${result.lowCount} low`);
-        return NextResponse.json({ ...emptyResponse(message), restock: result });
+        return NextResponse.json({ ...emptyResponse(message, lang), restock: result });
       } catch (err: any) {
         return NextResponse.json(emptyResponse("Couldn't get restock suggestions. Try again?"));
       }
@@ -266,7 +266,7 @@ export async function POST(req: NextRequest) {
         let message = `Collection "${result.title}" is live with ${result.productsAdded.length} products!`;
         try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
         rememberEvent(`Shopper created collection "${result.title}" with ${result.productsAdded.join(', ')}`);
-        return NextResponse.json({ ...emptyResponse(message), collection: result });
+        return NextResponse.json({ ...emptyResponse(message, lang), collection: result });
       } catch (err: any) {
         return NextResponse.json(emptyResponse(`Couldn't create collection: ${err.message}`));
       }
@@ -280,7 +280,7 @@ export async function POST(req: NextRequest) {
         let message = `Here are your recent orders.`;
         try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
         rememberEvent(`Shopper checked order status`);
-        return NextResponse.json({ ...emptyResponse(message), orderStatus: result });
+        return NextResponse.json({ ...emptyResponse(message, lang), orderStatus: result });
       } catch (err: any) {
         return NextResponse.json(emptyResponse(`Couldn't fetch orders: ${err.message}`));
       }
@@ -294,7 +294,7 @@ export async function POST(req: NextRequest) {
         let message = `Done! Refunded $${result.refundAmount} for order #${result.orderNumber}.`;
         try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
         rememberEvent(`Shopper refunded order #${result.orderNumber} for $${result.refundAmount}`);
-        return NextResponse.json({ ...emptyResponse(message), refund: result });
+        return NextResponse.json({ ...emptyResponse(message, lang), refund: result });
       } catch (err: any) {
         return NextResponse.json(emptyResponse(`Couldn't process refund: ${err.message}`));
       }
@@ -308,7 +308,7 @@ export async function POST(req: NextRequest) {
         let message = `Done! I've optimized the SEO for ${result.title}.`;
         try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
         rememberEvent(`Shopper optimized SEO for "${result.title}"`);
-        return NextResponse.json({ ...emptyResponse(message), seo: result });
+        return NextResponse.json({ ...emptyResponse(message, lang), seo: result });
       } catch (err: any) {
         return NextResponse.json(emptyResponse(`Couldn't optimize SEO: ${err.message}`));
       }
@@ -322,7 +322,7 @@ export async function POST(req: NextRequest) {
         let message = `Here's your ${result.platform} caption for ${result.productTitle}!`;
         try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
         rememberEvent(`Shopper generated ${result.platform} caption for "${result.productTitle}"`);
-        return NextResponse.json({ ...emptyResponse(message), socialCaption: result });
+        return NextResponse.json({ ...emptyResponse(message, lang), socialCaption: result });
       } catch (err: any) {
         return NextResponse.json(emptyResponse(`Couldn't generate caption: ${err.message}`));
       }
@@ -336,7 +336,7 @@ export async function POST(req: NextRequest) {
         let message = `I'd suggest pricing ${result.productTitle} at $${result.suggestedPrice}.`;
         try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
         rememberEvent(`Shopper got pricing suggestion for "${result.productTitle}": $${result.suggestedPrice}`);
-        return NextResponse.json({ ...emptyResponse(message), pricingSuggestion: result });
+        return NextResponse.json({ ...emptyResponse(message, lang), pricingSuggestion: result });
       } catch (err: any) {
         return NextResponse.json(emptyResponse(`Couldn't generate pricing suggestion: ${err.message}`));
       }
@@ -350,7 +350,7 @@ export async function POST(req: NextRequest) {
         let message = `Based on your data, next month's projected revenue is $${result.predictedNextMonth}.`;
         try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
         rememberEvent(`Shopper checked revenue forecast: predicted $${result.predictedNextMonth} next month`);
-        return NextResponse.json({ ...emptyResponse(message), revenueForecast: result });
+        return NextResponse.json({ ...emptyResponse(message, lang), revenueForecast: result });
       } catch (err: any) {
         return NextResponse.json(emptyResponse(`Couldn't generate forecast: ${err.message}`));
       }
@@ -364,7 +364,7 @@ export async function POST(req: NextRequest) {
         let message = `Here's your ${result.platform} ad for ${result.productTitle}!`;
         try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
         rememberEvent(`Shopper generated ${result.platform} ad for "${result.productTitle}"`);
-        return NextResponse.json({ ...emptyResponse(message), adCopy: result });
+        return NextResponse.json({ ...emptyResponse(message, lang), adCopy: result });
       } catch (err: any) {
         return NextResponse.json(emptyResponse(`Couldn't generate ad copy: ${err.message}`));
       }
@@ -383,7 +383,7 @@ export async function POST(req: NextRequest) {
     if (products.length > 0) {
       rememberEvent(`Shopper searched for "${searchQuery}" and found: ${products.map(p => p.title).join(', ')}`);
     }
-    return NextResponse.json({ ...emptyResponse(message), products });
+    return NextResponse.json({ ...emptyResponse(message, lang), products });
 
   } catch (err) {
     console.error('Chat API error:', err);
