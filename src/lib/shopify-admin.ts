@@ -17,46 +17,60 @@ function adminFetch(endpoint: string, options: RequestInit = {}) {
 
 // --- AI Image Generation ---
 
-async function generateProductImage(title: string, description: string): Promise<Buffer | null> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) { console.log('[IMG] No API key'); return null; }
+const IMAGE_MODELS = [
+  'gemini-2.0-flash-exp-image-generation',
+  'gemini-3.1-flash-image-preview',
+];
 
-  try {
-    const prompt = `Professional e-commerce product photo of ${title}. ${description || ''}. Clean white background, studio lighting, high quality product photography.`;
-    console.log('[IMG] Generating image for:', title);
-
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp-image-generation:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: `Generate an image: ${prompt}` }] }],
-          generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
-        }),
-        signal: AbortSignal.timeout(45000),
-      }
-    );
-
-    if (!res.ok) {
-      console.log('[IMG] Gemini returned', res.status, await res.text().catch(() => ''));
-      return null;
+async function tryGenerateWithModel(model: string, prompt: string, apiKey: string): Promise<Buffer | null> {
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: `Generate an image: ${prompt}` }] }],
+        generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
+      }),
+      signal: AbortSignal.timeout(50000),
     }
-    const data = await res.json();
+  );
 
-    const parts = data.candidates?.[0]?.content?.parts || [];
-    const imagePart = parts.find((p: any) => p.inlineData?.mimeType?.startsWith('image/'));
-    if (!imagePart) {
-      console.log('[IMG] No image part in response. Parts:', parts.map((p: any) => Object.keys(p)));
-      return null;
-    }
-
-    console.log('[IMG] Got image, size:', imagePart.inlineData.data.length, 'chars');
-    return Buffer.from(imagePart.inlineData.data, 'base64');
-  } catch (err) {
-    console.error('[IMG] Generation failed:', err);
+  if (!res.ok) {
+    console.log(`[IMG] ${model} returned ${res.status}`);
     return null;
   }
+
+  const data = await res.json();
+  const parts = data.candidates?.[0]?.content?.parts || [];
+  const imagePart = parts.find((p: any) => p.inlineData?.mimeType?.startsWith('image/'));
+  if (!imagePart) {
+    console.log(`[IMG] ${model} returned no image part`);
+    return null;
+  }
+
+  console.log(`[IMG] ${model} success, size: ${imagePart.inlineData.data.length} chars`);
+  return Buffer.from(imagePart.inlineData.data, 'base64');
+}
+
+async function generateProductImage(title: string, description: string): Promise<Buffer | null> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
+
+  const prompt = `Professional e-commerce product photo of ${title}. ${description || ''}. Clean white background, studio lighting, high quality product photography.`;
+  console.log('[IMG] Generating image for:', title);
+
+  for (const model of IMAGE_MODELS) {
+    try {
+      const result = await tryGenerateWithModel(model, prompt, apiKey);
+      if (result) return result;
+    } catch (err) {
+      console.log(`[IMG] ${model} failed:`, (err as Error).message);
+    }
+  }
+
+  console.log('[IMG] All models failed');
+  return null;
 }
 
 async function attachImageToProduct(productId: number, imageBuffer: Buffer): Promise<string | null> {
