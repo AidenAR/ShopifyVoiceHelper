@@ -2,6 +2,7 @@
 
 > Built at **ListenHacks 2026** — an invite-only hackday exploring the future of voice, audio, and AI.
 > **Live:** https://ivyshopify-production.up.railway.app/
+> **Demo Videos:** [Loom 1 - Full](https://www.loom.com/share/c3830672417642e2b7126937c97d82e2) · [Loom 2 - Image gen](https://www.loom.com/share/ec3fe9a445b04aefa08b1f9f730a0314)
 
 Ivy is a voice-first Shopify store management assistant with **24 voice intents**. Speak naturally to search products, create listings with AI-generated images, manage prices and inventory, optimize SEO, generate social media captions and ad copy, forecast revenue, get pricing suggestions, fulfill orders, process refunds, and more — all hands-free with "Hey Ivy" wake word, in any language.
 
