@@ -115,26 +115,34 @@ export async function createProduct(input: CreateProductInput) {
   };
 }
 
-// --- Update Product Price ---
+// --- Shared: fuzzy product finder ---
 
-export async function updateProductPrice(productName: string, newPrice: string) {
-  const baseName = productName.toLowerCase().replace(/^(all|the|my)\s+/i, '').trim();
+async function fetchAllProducts() {
+  const res = await adminFetch('/products.json?limit=50');
+  if (!res.ok) throw new Error('Failed to fetch products');
+  const data = await res.json();
+  return data.products || [];
+}
+
+function fuzzyFindProduct(products: any[], name: string) {
+  const baseName = name.toLowerCase().replace(/^(all|the|my)\s+/i, '').trim();
   const nameVariants = new Set([
     baseName,
     baseName.replace(/s$/, ''),
     baseName.replace(/es$/, ''),
     baseName.replace(/ies$/, 'y'),
   ]);
-
-  const searchRes = await adminFetch(`/products.json?limit=50`);
-  if (!searchRes.ok) throw new Error('Failed to search products');
-  const searchData = await searchRes.json();
-
-  const product = searchData.products?.find((p: any) => {
+  return products.find((p: any) => {
     const title = p.title.toLowerCase();
     return [...nameVariants].some(v => title.includes(v) || v.includes(title.replace('test ', '')));
   });
+}
 
+// --- Update Product Price ---
+
+export async function updateProductPrice(productName: string, newPrice: string) {
+  const products = await fetchAllProducts();
+  const product = fuzzyFindProduct(products, productName);
   if (!product) throw new Error(`Product "${productName}" not found`);
 
   const variants = product.variants || [];
@@ -261,5 +269,265 @@ export async function createDiscountCode(code: string, percentage: string, descr
     percentage,
     description: description || `${percentage}% off everything`,
     priceRuleId,
+  };
+}
+
+// --- Update Inventory ---
+
+export async function updateInventory(productName: string, quantity: number) {
+  const products = await fetchAllProducts();
+  const product = fuzzyFindProduct(products, productName);
+  if (!product) throw new Error(`Product "${productName}" not found`);
+
+  // Get the first location
+  const locRes = await adminFetch('/locations.json');
+  if (!locRes.ok) throw new Error('Failed to fetch locations');
+  const locData = await locRes.json();
+  const locationId = locData.locations?.[0]?.id;
+  if (!locationId) throw new Error('No locations found');
+
+  const variants = product.variants || [];
+  const oldQuantity = variants.reduce((sum: number, v: any) => sum + (v.inventory_quantity || 0), 0);
+
+  await Promise.all(
+    variants
+      .filter((v: any) => v.inventory_item_id)
+      .map((v: any) =>
+        adminFetch('/inventory_levels/set.json', {
+          method: 'POST',
+          body: JSON.stringify({
+            location_id: locationId,
+            inventory_item_id: v.inventory_item_id,
+            available: quantity,
+          }),
+        })
+      )
+  );
+
+  return {
+    title: product.title,
+    oldQuantity,
+    newQuantity: quantity * variants.length,
+    variantsUpdated: variants.length,
+  };
+}
+
+export async function getInventorySummary() {
+  const products = await fetchAllProducts();
+  const inventory = products.map((p: any) => {
+    const totalStock = (p.variants || []).reduce((sum: number, v: any) => sum + (v.inventory_quantity || 0), 0);
+    return { title: p.title, stock: totalStock, variants: (p.variants || []).length };
+  });
+
+  const totalStock = inventory.reduce((sum: number, p: any) => sum + p.stock, 0);
+  const lowStock = inventory.filter((p: any) => p.stock > 0 && p.stock <= 10);
+  const outOfStock = inventory.filter((p: any) => p.stock <= 0);
+
+  return { products: inventory, totalStock, totalProducts: products.length, lowStock, outOfStock };
+}
+
+// --- Delete Product ---
+
+export async function deleteProduct(productName: string) {
+  const products = await fetchAllProducts();
+  const product = fuzzyFindProduct(products, productName);
+  if (!product) throw new Error(`Product "${productName}" not found`);
+
+  const res = await adminFetch(`/products/${product.id}.json`, { method: 'DELETE' });
+  if (!res.ok) throw new Error(`Delete failed: ${await res.text()}`);
+
+  return { id: product.id, title: product.title };
+}
+
+// --- Order Fulfillment ---
+
+export async function fulfillOrder(orderRef?: string) {
+  // Get orders
+  const ordersRes = await adminFetch('/orders.json?status=any&limit=20&fulfillment_status=unfulfilled');
+  if (!ordersRes.ok) throw new Error('Failed to fetch orders');
+  const { orders } = await ordersRes.json();
+
+  if (!orders || orders.length === 0) throw new Error('No unfulfilled orders found');
+
+  // Find the right order — latest by default, or match by number
+  let order;
+  if (orderRef) {
+    const num = orderRef.replace(/[^0-9]/g, '');
+    order = orders.find((o: any) => String(o.order_number) === num || String(o.id) === num);
+  }
+  if (!order) order = orders[0];
+
+  // Get fulfillment orders
+  const foRes = await adminFetch(`/orders/${order.id}/fulfillment_orders.json`);
+  if (!foRes.ok) throw new Error('Failed to get fulfillment orders');
+  const foData = await foRes.json();
+  const fulfillmentOrders = foData.fulfillment_orders?.filter((fo: any) => fo.status === 'open') || [];
+
+  if (fulfillmentOrders.length === 0) throw new Error(`Order #${order.order_number} has no items to fulfill`);
+
+  const fulfillRes = await adminFetch('/fulfillments.json', {
+    method: 'POST',
+    body: JSON.stringify({
+      fulfillment: {
+        line_items_by_fulfillment_order: fulfillmentOrders.map((fo: any) => ({
+          fulfillment_order_id: fo.id,
+        })),
+      },
+    }),
+  });
+
+  if (!fulfillRes.ok) throw new Error(`Fulfillment failed: ${await fulfillRes.text()}`);
+
+  const itemCount = order.line_items?.length || 0;
+  return {
+    orderNumber: order.order_number,
+    orderId: order.id,
+    customerName: order.customer ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim() : 'Guest',
+    itemCount,
+    totalPrice: order.total_price,
+  };
+}
+
+// --- Customer Lookup ---
+
+export async function getCustomers() {
+  const res = await adminFetch('/customers.json?limit=50');
+  if (!res.ok) throw new Error('Failed to fetch customers');
+  const { customers } = await res.json();
+
+  const recent = (customers || []).slice(0, 5).map((c: any) => ({
+    name: `${c.first_name || ''} ${c.last_name || ''}`.trim() || 'Unknown',
+    email: c.email || 'N/A',
+    ordersCount: c.orders_count || 0,
+    totalSpent: c.total_spent || '0.00',
+  }));
+
+  return {
+    totalCustomers: customers?.length || 0,
+    recentCustomers: recent,
+  };
+}
+
+// --- Bulk Price Operations ---
+
+export async function bulkPriceUpdate(operation: string, value: string) {
+  const products = await fetchAllProducts();
+  if (products.length === 0) throw new Error('No products found');
+
+  const results: { title: string; oldPrice: string; newPrice: string }[] = [];
+
+  for (const product of products) {
+    for (const v of product.variants || []) {
+      const oldPrice = parseFloat(v.price);
+      let newPrice: number;
+
+      if (operation === 'percentage_off') {
+        newPrice = oldPrice * (1 - parseFloat(value) / 100);
+      } else if (operation === 'percentage_increase') {
+        newPrice = oldPrice * (1 + parseFloat(value) / 100);
+      } else if (operation === 'flat_increase') {
+        newPrice = oldPrice + parseFloat(value);
+      } else if (operation === 'flat_decrease') {
+        newPrice = oldPrice - parseFloat(value);
+      } else if (operation === 'set_price') {
+        newPrice = parseFloat(value);
+      } else {
+        continue;
+      }
+
+      newPrice = Math.max(0, Math.round(newPrice * 100) / 100);
+
+      await adminFetch(`/variants/${v.id}.json`, {
+        method: 'PUT',
+        body: JSON.stringify({ variant: { id: v.id, price: String(newPrice) } }),
+      });
+
+      results.push({ title: product.title, oldPrice: v.price, newPrice: String(newPrice) });
+    }
+  }
+
+  return { productsUpdated: products.length, changes: results };
+}
+
+// --- Product Comparison ---
+
+export async function compareProducts(name1: string, name2: string) {
+  const products = await fetchAllProducts();
+  const p1 = fuzzyFindProduct(products, name1);
+  const p2 = fuzzyFindProduct(products, name2);
+
+  if (!p1) throw new Error(`Product "${name1}" not found`);
+  if (!p2) throw new Error(`Product "${name2}" not found`);
+
+  const format = (p: any) => ({
+    title: p.title,
+    price: p.variants?.[0]?.price || '0',
+    description: p.body_html?.replace(/<[^>]*>/g, '') || '',
+    type: p.product_type || 'General',
+    stock: (p.variants || []).reduce((s: number, v: any) => s + (v.inventory_quantity || 0), 0),
+    variants: (p.variants || []).length,
+    image: p.images?.[0]?.src || null,
+    createdAt: p.created_at?.split('T')[0] || '',
+  });
+
+  return { product1: format(p1), product2: format(p2) };
+}
+
+// --- Reorder Suggestions ---
+
+export async function getRestockSuggestions() {
+  const products = await fetchAllProducts();
+
+  const suggestions = products
+    .map((p: any) => {
+      const stock = (p.variants || []).reduce((s: number, v: any) => s + (v.inventory_quantity || 0), 0);
+      return { title: p.title, stock, type: p.product_type || 'General' };
+    })
+    .filter((p: any) => p.stock <= 20)
+    .sort((a: any, b: any) => a.stock - b.stock);
+
+  return {
+    suggestions,
+    urgentCount: suggestions.filter((s: any) => s.stock <= 0).length,
+    lowCount: suggestions.filter((s: any) => s.stock > 0 && s.stock <= 10).length,
+    watchCount: suggestions.filter((s: any) => s.stock > 10 && s.stock <= 20).length,
+  };
+}
+
+// --- Create Collection ---
+
+export async function createCollection(title: string, productNames: string[]) {
+  // Create a custom collection
+  const res = await adminFetch('/custom_collections.json', {
+    method: 'POST',
+    body: JSON.stringify({
+      custom_collection: { title, published: true },
+    }),
+  });
+
+  if (!res.ok) throw new Error(`Collection creation failed: ${await res.text()}`);
+  const { custom_collection } = await res.json();
+
+  // Add products to collection
+  const products = await fetchAllProducts();
+  const matched: string[] = [];
+
+  for (const name of productNames) {
+    const product = fuzzyFindProduct(products, name);
+    if (product) {
+      await adminFetch('/collects.json', {
+        method: 'POST',
+        body: JSON.stringify({
+          collect: { product_id: product.id, collection_id: custom_collection.id },
+        }),
+      });
+      matched.push(product.title);
+    }
+  }
+
+  return {
+    id: custom_collection.id,
+    title: custom_collection.title,
+    productsAdded: matched,
   };
 }

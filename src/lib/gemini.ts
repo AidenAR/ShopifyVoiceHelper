@@ -14,6 +14,16 @@ ADD TO CART: {"action":"add_to_cart","productName":"name they referenced","lang"
 EDIT PRICE: {"action":"edit_price","productName":"product to update","newPrice":"29.99","lang":"xx"}
 ANALYTICS: {"action":"analytics","query":"what they want to know","lang":"xx"}
 DISCOUNT: {"action":"create_discount","code":"CODE_NAME","percentage":"20","description":"clean readable description","lang":"xx"}
+UPDATE INVENTORY: {"action":"update_inventory","productName":"product name","quantity":200,"lang":"xx"}
+CHECK INVENTORY: {"action":"check_inventory","lang":"xx"}
+DELETE PRODUCT: {"action":"delete_product","productName":"product to delete","lang":"xx"}
+FULFILL ORDER: {"action":"fulfill_order","orderRef":"order number or latest","lang":"xx"}
+CUSTOMER LOOKUP: {"action":"customers","lang":"xx"}
+BULK PRICE: {"action":"bulk_price","operation":"percentage_off|percentage_increase|flat_increase|flat_decrease|set_price","value":"10","lang":"xx"}
+COMPARE: {"action":"compare","product1":"first product","product2":"second product","lang":"xx"}
+DESCRIBE SEARCH: {"action":"describe_search","description":"detailed description of desired product in English","lang":"xx"}
+RESTOCK SUGGESTIONS: {"action":"restock","lang":"xx"}
+CREATE COLLECTION: {"action":"create_collection","title":"collection name","productNames":["hoodie","t-shirt"],"lang":"xx"}
 
 Rules:
 - "add", "create", "list", "put up", "new product" with product details → create
@@ -21,20 +31,40 @@ Rules:
 - "change price", "update price", "make it cost" → edit_price
 - "sales", "analytics", "revenue", "orders", "best seller", "how's my store" → analytics
 - "discount", "coupon", "promo code" → create_discount
+- "set stock", "update inventory", "restock", "set quantity" → update_inventory
+- "how much stock", "inventory", "what's in stock", "check inventory" → check_inventory
+- "delete product", "remove product", "take down", "get rid of" → delete_product
+- "fulfill order", "ship order", "mark as shipped", "complete order" → fulfill_order
+- "customers", "how many customers", "show me customers", "customer list" → customers
+- "set all products to X% off", "increase all prices by $Y", "decrease all prices" → bulk_price (operation: percentage_off, percentage_increase, flat_increase, flat_decrease, set_price)
+- "compare the hoodie and the jacket", "difference between X and Y" → compare
+- "find something like a cozy warm sweater", "show me something that looks like a red jacket", "I want something similar to X" → describe_search (use a rich English description)
+- "what should I restock?", "reorder suggestions", "what's running low?" → restock
+- "create a collection called X with hoodies and shirts", "make a Summer Sale collection" → create_collection
 - Everything else about finding/showing products → search
 - For discount codes: if they don't specify a code name, generate a catchy one in ALL_CAPS
 - For discount: percentage should be just the number (e.g. "20" not "20%")
 - For discount description: ALWAYS rewrite into a clean, readable description. Never copy the user's raw text with typos or weird casing.
 - IMPORTANT: searchQuery should ALWAYS be in English (translate if needed) so Shopify search works, but "lang" should reflect the ORIGINAL language the user spoke in
-- Understand queries in any language: "Montre-moi des chandails" → {"action":"search","searchQuery":"sweaters","lang":"fr"}`;
+- Understand queries in any language: "Montre-moi des chandails" → {"action":"search","searchQuery":"sweaters","lang":"fr"}
 
-const RESPONSE_PROMPT = `You are a friendly voice shopping assistant named ShopifyVoice. Generate a brief, natural spoken response (1-2 sentences, under 40 words).
+CONTEXT AWARENESS (critical):
+- Use the conversation history to resolve references like "that", "it", "the one we just talked about", "those", "the same one"
+- If user says "put a discount on that hoodie" after discussing Test Hoodie, resolve "that hoodie" → "Test Hoodie"
+- If user says "delete it" after creating a product, resolve "it" to the product just created
+- If user says "change its price to $40" after showing products, resolve "its" to the last discussed product
+- Use the "Products currently shown" list to resolve ambiguous product references
+- "all hoodies" or "the hoodies" should resolve to the actual product name from context
+- When the user refers to a product by nickname or partial name, match it to the best product from history or shown products`;
+
+const RESPONSE_PROMPT = `You are Ivy, a friendly and personable AI store assistant built for Shopify merchants. You have a warm, approachable personality. Generate a brief, natural spoken response (1-2 sentences, under 40 words).
 
 Rules:
 - Sound natural when spoken aloud — no markdown, no bullets, no special formatting
-- Be warm, helpful, conversational
+- Be warm, helpful, conversational — like a knowledgeable colleague
 - Match the context: product found, product created, added to cart, price updated, analytics summary, discount created
 - Never say "I found X products" — just naturally reference them
+- You can occasionally say things like "Got it!", "Done!", "Here you go!", "On it!" to feel alive
 - CRITICAL: You MUST respond in the SAME LANGUAGE the user spoke in. If they spoke French, respond in French. If Spanish, respond in Spanish. Match their language exactly.`;
 
 export async function parseIntent(
@@ -45,7 +75,7 @@ export async function parseIntent(
   const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
   const historyContext = history.length > 0
-    ? `\nRecent conversation:\n${history.slice(-6).map(h => `${h.role}: ${h.content}`).join('\n')}\n`
+    ? `\nRecent conversation (use this to resolve "that", "it", "the one", etc.):\n${history.slice(-10).map(h => `${h.role}: ${h.content}`).join('\n')}\n`
     : '';
 
   const productsContext = lastProducts && lastProducts.length > 0

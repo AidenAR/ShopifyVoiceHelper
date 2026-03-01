@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ShopifyVoice — Voice Shopping Assistant",
-  description: "Shop by voice. Powered by AI.",
+  title: "Ivy — AI Store Assistant by ShopifyVoice",
+  description: "Manage your entire Shopify store by voice. Powered by Gemini, ElevenLabs & Backboard.io.",
 };
 
 export default function RootLayout({
@@ -23,7 +23,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >

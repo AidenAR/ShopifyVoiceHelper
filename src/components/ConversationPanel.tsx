@@ -26,15 +26,18 @@ export default function ConversationPanel({ messages, isLoading, onAddToCart }: 
       {isLoading && (
         <div className="flex justify-start">
           <div className="max-w-[85%]">
-            <div className="text-[10px] uppercase tracking-widest font-medium mb-1.5 px-1 text-slate-500">
-              ShopifyVoice
+            <div className="flex items-center gap-2 mb-1.5 px-1">
+              <div className="w-6 h-6 rounded-full bg-[#008060] flex items-center justify-center">
+                <span className="text-white text-[10px] font-bold">Iv</span>
+              </div>
+              <span className="text-[11px] font-medium text-[#6b6b6b]">Ivy</span>
             </div>
-            <div className="rounded-2xl px-4 py-3 bg-white/[0.04] border border-white/[0.06]">
+            <div className="rounded-2xl rounded-tl-md px-4 py-3 bg-white border border-[#e8e6e1] shadow-sm">
               <div className="flex items-center gap-1.5">
                 {[0, 1, 2].map((i) => (
                   <div
                     key={i}
-                    className="w-1.5 h-1.5 rounded-full bg-slate-500 animate-bounce"
+                    className="w-1.5 h-1.5 rounded-full bg-[#008060] animate-bounce"
                     style={{ animationDelay: `${i * 0.15}s`, animationDuration: '0.8s' }}
                   />
                 ))}

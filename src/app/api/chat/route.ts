@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parseIntent, generateResponse } from '@/lib/gemini';
 import { searchProducts } from '@/lib/shopify';
-import { createProduct, updateProductPrice, getStoreAnalytics, createDiscountCode } from '@/lib/shopify-admin';
+import { createProduct, updateProductPrice, getStoreAnalytics, createDiscountCode, updateInventory, getInventorySummary, deleteProduct, fulfillOrder, getCustomers, bulkPriceUpdate, compareProducts, getRestockSuggestions, createCollection } from '@/lib/shopify-admin';
 import { saveShoppingEvent } from '@/lib/backboard';
 
 function emptyResponse(message: string) {
-  return { message, products: [], created: null, priceUpdate: null, analytics: null, discount: null, addedToCart: null };
+  return { message, products: [], created: null, priceUpdate: null, analytics: null, discount: null, addedToCart: null, inventoryUpdate: null, inventorySummary: null, deletedProduct: null, fulfillment: null, customers: null, bulkPrice: null, comparison: null, restock: null, collection: null };
 }
 
 function rememberEvent(event: string) {
@@ -126,6 +126,149 @@ export async function POST(req: NextRequest) {
         });
       } catch (err: any) {
         return NextResponse.json(emptyResponse(`Couldn't create discount: ${err.message}`));
+      }
+    }
+
+    // --- UPDATE INVENTORY ---
+    if (intent.action === 'update_inventory') {
+      try {
+        const result = await updateInventory(intent.productName, parseInt(intent.quantity));
+        const context = `Updated "${result.title}" inventory from ${result.oldQuantity} to ${result.newQuantity} units`;
+        let message = `Done! ${result.title} now has ${result.newQuantity} units in stock.`;
+        try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
+        rememberEvent(`Shopper updated inventory for "${result.title}" to ${result.newQuantity} units`);
+        return NextResponse.json({ ...emptyResponse(message), inventoryUpdate: result });
+      } catch (err: any) {
+        return NextResponse.json(emptyResponse(`Couldn't update inventory: ${err.message}`));
+      }
+    }
+
+    // --- CHECK INVENTORY ---
+    if (intent.action === 'check_inventory') {
+      try {
+        const summary = await getInventorySummary();
+        const context = `Inventory: ${summary.totalStock} total units across ${summary.totalProducts} products. ${summary.lowStock.length} low stock, ${summary.outOfStock.length} out of stock.`;
+        let message = `You have ${summary.totalStock} units across ${summary.totalProducts} products.`;
+        try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
+        return NextResponse.json({ ...emptyResponse(message), inventorySummary: summary });
+      } catch (err: any) {
+        return NextResponse.json(emptyResponse("Couldn't check inventory right now. Try again?"));
+      }
+    }
+
+    // --- DELETE PRODUCT ---
+    if (intent.action === 'delete_product') {
+      try {
+        const result = await deleteProduct(intent.productName);
+        const context = `Deleted product "${result.title}" from the store`;
+        let message = `Done! "${result.title}" has been removed from your store.`;
+        try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
+        rememberEvent(`Shopper deleted product "${result.title}" from the store`);
+        return NextResponse.json({ ...emptyResponse(message), deletedProduct: result });
+      } catch (err: any) {
+        return NextResponse.json(emptyResponse(`Couldn't delete product: ${err.message}`));
+      }
+    }
+
+    // --- FULFILL ORDER ---
+    if (intent.action === 'fulfill_order') {
+      try {
+        const result = await fulfillOrder(intent.orderRef);
+        const context = `Fulfilled order #${result.orderNumber} for ${result.customerName} — ${result.itemCount} items, $${result.totalPrice}`;
+        let message = `Order #${result.orderNumber} for ${result.customerName} is now fulfilled!`;
+        try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
+        rememberEvent(`Shopper fulfilled order #${result.orderNumber} for ${result.customerName}`);
+        return NextResponse.json({ ...emptyResponse(message), fulfillment: result });
+      } catch (err: any) {
+        return NextResponse.json(emptyResponse(`Couldn't fulfill order: ${err.message}`));
+      }
+    }
+
+    // --- CUSTOMER LOOKUP ---
+    if (intent.action === 'customers') {
+      try {
+        const result = await getCustomers();
+        const context = `Store has ${result.totalCustomers} customers. Recent: ${result.recentCustomers.map((c: { name: string; ordersCount: number; totalSpent: string }) => `${c.name} (${c.ordersCount} orders, $${c.totalSpent})`).join(', ')}`;
+        let message = `You have ${result.totalCustomers} customers.`;
+        try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
+        return NextResponse.json({ ...emptyResponse(message), customers: result });
+      } catch (err: any) {
+        return NextResponse.json(emptyResponse("Couldn't fetch customer data right now. Try again?"));
+      }
+    }
+
+    // --- BULK PRICE ---
+    if (intent.action === 'bulk_price') {
+      try {
+        const result = await bulkPriceUpdate(intent.operation, intent.value);
+        const context = `Bulk price update: ${result.productsUpdated} products updated with operation "${intent.operation}" value ${intent.value}`;
+        let message = `Done! Updated prices across ${result.productsUpdated} products.`;
+        try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
+        rememberEvent(`Shopper did bulk price update: ${intent.operation} ${intent.value} on ${result.productsUpdated} products`);
+        return NextResponse.json({ ...emptyResponse(message), bulkPrice: result });
+      } catch (err: any) {
+        return NextResponse.json(emptyResponse(`Couldn't do bulk price update: ${err.message}`));
+      }
+    }
+
+    // --- COMPARE PRODUCTS ---
+    if (intent.action === 'compare') {
+      try {
+        const result = await compareProducts(intent.product1, intent.product2);
+        const context = `Comparing "${result.product1.title}" ($${result.product1.price}, ${result.product1.stock} in stock) vs "${result.product2.title}" ($${result.product2.price}, ${result.product2.stock} in stock)`;
+        let message = `Here's a side-by-side comparison of ${result.product1.title} and ${result.product2.title}.`;
+        try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
+        rememberEvent(`Shopper compared "${result.product1.title}" vs "${result.product2.title}"`);
+        return NextResponse.json({ ...emptyResponse(message), comparison: result });
+      } catch (err: any) {
+        return NextResponse.json(emptyResponse(`Couldn't compare products: ${err.message}`));
+      }
+    }
+
+    // --- DESCRIBE SEARCH (semantic matching) ---
+    if (intent.action === 'describe_search') {
+      const searchQuery = intent.description || transcript;
+      const products = await searchProducts(searchQuery);
+      const context = products.length > 0
+        ? `Found products matching description "${searchQuery}": ${products.map(p => `${p.title} — $${p.price}`).join(', ')}`
+        : 'No products matched that description.';
+      let message = products.length > 0
+        ? `I found some items matching your description!`
+        : `Nothing matched that description. Try different words?`;
+      try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
+      if (products.length > 0) {
+        rememberEvent(`Shopper searched by description: "${searchQuery}" and found: ${products.map(p => p.title).join(', ')}`);
+      }
+      return NextResponse.json({ ...emptyResponse(message), products });
+    }
+
+    // --- RESTOCK SUGGESTIONS ---
+    if (intent.action === 'restock') {
+      try {
+        const result = await getRestockSuggestions();
+        const context = `Restock suggestions: ${result.urgentCount} out of stock, ${result.lowCount} low stock, ${result.watchCount} to watch. Top items: ${result.suggestions.slice(0, 5).map((s: { title: string; stock: number }) => `${s.title} (${s.stock} left)`).join(', ')}`;
+        let message = result.suggestions.length > 0
+          ? `Found ${result.suggestions.length} products needing attention — ${result.urgentCount} urgent.`
+          : 'All your products are well stocked!';
+        try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
+        rememberEvent(`Shopper checked restock suggestions: ${result.urgentCount} urgent, ${result.lowCount} low`);
+        return NextResponse.json({ ...emptyResponse(message), restock: result });
+      } catch (err: any) {
+        return NextResponse.json(emptyResponse("Couldn't get restock suggestions. Try again?"));
+      }
+    }
+
+    // --- CREATE COLLECTION ---
+    if (intent.action === 'create_collection') {
+      try {
+        const result = await createCollection(intent.title || 'New Collection', intent.productNames || []);
+        const context = `Created collection "${result.title}" with ${result.productsAdded.length} products: ${result.productsAdded.join(', ')}`;
+        let message = `Collection "${result.title}" is live with ${result.productsAdded.length} products!`;
+        try { message = await generateResponse(transcript, context, history || [], lang); } catch {}
+        rememberEvent(`Shopper created collection "${result.title}" with ${result.productsAdded.join(', ')}`);
+        return NextResponse.json({ ...emptyResponse(message), collection: result });
+      } catch (err: any) {
+        return NextResponse.json(emptyResponse(`Couldn't create collection: ${err.message}`));
       }
     }
 
